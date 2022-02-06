@@ -1,0 +1,8 @@
+[submodule "BorealisNATSBus"]
+	path = .nats/seed/nats-deployment
+	url = git@github.com:aurora-is-near/nats-validator.git
+	branch = aurora-deploy
+[submodule "BorealisIndexer"]
+	path = .submodules/borealis-indexer
+	url = git@github.com:aurora-is-near/borealis-indexer.git
+	branch = main

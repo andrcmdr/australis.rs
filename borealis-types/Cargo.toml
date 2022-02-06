@@ -1,0 +1,29 @@
+[package]
+name = "borealis-types"
+version = "0.1.0"
+authors = ["Aurora <hello@aurora.dev>"]
+edition = "2021"
+description = "Definition of message types (`BorealisMessage` and `StreamerMessage`), sent over the wire by the Borealis Indexer (producer for the Borealis NATS Bus), and implementation of methods to encode and decode messages of these types."
+homepage = "https://github.com/aurora-is-near/borealis-indexer"
+repository = "https://github.com/aurora-is-near/borealis-indexer"
+license = "GPLv3"
+publish = false
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+near-primitives = { git = "https://github.com/near/nearcore", rev = "83fc0f7d6b212bacc49f058e7400743de3e59783" }
+serde = { version = "1", features = [ "derive" ] }
+serde_json = "1.0.55"
+serde_cbor = "0.11.2"
+rand = "0.8.4"
+
+[dev-dependencies]
+
+[build-dependencies]
+
+[target]
+
+[features]
+
