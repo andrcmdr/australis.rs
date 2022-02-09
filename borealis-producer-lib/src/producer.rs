@@ -55,7 +55,7 @@ impl Default for RunArgs {
             creds_path: Some(std::path::PathBuf::from("./.nats/seed/nats.creds")),
             nats_server: "tls://eastcoast.nats.backend.aurora.dev:4222,tls://westcoast.nats.backend.aurora.dev:4222".to_string(),
             subject: "BlockIndex_StreamerMessages_mainnet".to_string(),
-            msg_format: MsgFormat::CBOR,
+            msg_format: MsgFormat::Cbor,
             sync_mode: SyncMode::LatestSynced,
             block_height: None,
             await_synced: AwaitSynced::WaitForFullSync,
@@ -66,17 +66,27 @@ impl Default for RunArgs {
 /// Streaming messages format (should be upper case, 'cause it's a suffix for `subject` name, and NATS subject is case sensitive)
 #[derive(Debug, Clone, Copy)]
 pub enum MsgFormat {
-    CBOR,
-    JSON,
+    Cbor,
+    Json,
 }
 
 impl FromStr for MsgFormat {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "CBOR" | "Cbor" | "cbor" => Ok(MsgFormat::CBOR),
-            "JSON" | "Json" | "json" => Ok(MsgFormat::JSON),
+        let input = s.to_lowercase();
+        match input.as_str() {
+            "cbor" => Ok(MsgFormat::Cbor),
+            "json" => Ok(MsgFormat::Json),
             _ => Err("Unknown message format: `--msg-fomat` should contain `CBOR` or `JSON`".to_string().into()),
+        }
+    }
+}
+
+impl ToString for MsgFormat {
+    fn to_string(&self) -> String {
+        match self {
+            MsgFormat::Cbor => String::from("CBOR"),
+            MsgFormat::Json => String::from("JSON"),
         }
     }
 }
@@ -95,10 +105,11 @@ pub enum SyncMode {
 impl FromStr for SyncMode {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "LatestSynced" | "Latestsynced" | "latestsynced" => Ok(SyncMode::LatestSynced),
-            "FromInterruption" | "Frominterruption" | "frominterruption" => Ok(SyncMode::FromInterruption),
-            "BlockHeight" | "Blockheight" | "blockheight" => Ok(SyncMode::BlockHeight),
+        let input = s.to_lowercase();
+        match input.as_str() {
+            "latestsynced" => Ok(SyncMode::LatestSynced),
+            "frominterruption" => Ok(SyncMode::FromInterruption),
+            "blockheight" => Ok(SyncMode::BlockHeight),
             _ => Err("Unknown indexer synchronization mode: `--sync-mode` should be `LatestSynced`, `FromInterruption` or `BlockHeight` with --block-height explicit pointing".to_string().into()),
         }
     }
@@ -116,9 +127,10 @@ pub enum AwaitSynced {
 impl FromStr for AwaitSynced {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "WaitForFullSync" | "Waitforfullsync" | "waitforfullsync" => Ok(AwaitSynced::WaitForFullSync),
-            "StreamWhileSyncing" | "Streamwhilesyncing" | "streamwhilesyncing" => Ok(AwaitSynced::StreamWhileSyncing),
+        let input = s.to_lowercase();
+        match input.as_str() {
+            "waitforfullsync" => Ok(AwaitSynced::WaitForFullSync),
+            "streamwhilesyncing" => Ok(AwaitSynced::StreamWhileSyncing),
             _ => Err("Unknown indexer node await synchronization mode: `--await-synced` should be `WaitForFullSync` or `StreamWhileSyncing`".to_string().into()),
         }
     }
@@ -138,10 +150,11 @@ pub enum VerbosityLevel {
 impl FromStr for VerbosityLevel {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "0" | "WithBlockHashHeight" | "Withblockhashheight" | "withblockhashheight" => Ok(VerbosityLevel::WithBlockHashHeight),
-            "1" | "WithStreamerMessageDump" | "Withstreamermessagedump" | "withstreamermessagedump" => Ok(VerbosityLevel::WithStreamerMessageDump),
-            "2" | "WithStreamerMessageParse" | "Withstreamermessageparse" | "withstreamermessageparse" => Ok(VerbosityLevel::WithStreamerMessageParse),
+        let input = s.to_lowercase();
+        match input.as_str() {
+            "0" | "withblockhashheight" => Ok(VerbosityLevel::WithBlockHashHeight),
+            "1" | "withstreamermessagedump" => Ok(VerbosityLevel::WithStreamerMessageDump),
+            "2" | "withstreamermessageparse" => Ok(VerbosityLevel::WithStreamerMessageParse),
             _ => Err("Unknown output verbosity level: `--verbose` should be `WithBlockHashHeight` (`0`), `WithStreamerMessageDump` (`1`) or `WithStreamerMessageParse` (`2`)".to_string().into()),
         }
     }
@@ -365,13 +378,13 @@ pub fn nats_check_connection(nats_connection: &nats::Connection) {
 /// Create Borealis Message with payload
 pub fn message_encode<T: Serialize>(args: &RunArgs, msg_seq_id: u64, payload: &T) -> Vec<u8> {
     match args.msg_format {
-        MsgFormat::CBOR => {
+        MsgFormat::Cbor => {
             BorealisMessage::new(
                 msg_seq_id,
                 payload,
             ).to_cbor()
         }
-        MsgFormat::JSON => {
+        MsgFormat::Json => {
             BorealisMessage::new(
                 msg_seq_id,
                 payload,
@@ -383,10 +396,10 @@ pub fn message_encode<T: Serialize>(args: &RunArgs, msg_seq_id: u64, payload: &T
 /// Publish (transfer) message to Borealis NATS Bus
 pub fn message_publish<T: AsRef<[u8]>>(args: &RunArgs, nats_connection: &nats::Connection, message: &T) {
     nats_connection.publish(
-        format!("{}_{:?}", args.subject, args.msg_format).as_str(),
+        format!("{}_{}", args.subject, args.msg_format.to_string()).as_str(),
         message,
     )
-    .expect(format!("[Message as {:?} encoded bytes vector] Message passing error", args.msg_format).as_str());
+    .expect(format!("[Message as {} encoded bytes vector] Message passing error", args.msg_format.to_string()).as_str());
 }
 
 ///Run Borealis Indexer as Borealis NATS Bus Producer
@@ -452,7 +465,7 @@ pub async fn listen_events(args: &RunArgs, events_stream: mpsc::Receiver<near_in
 pub async fn handle_message(args: &RunArgs, streamer_message: near_indexer::StreamerMessage, nats_connection: &nats::Connection) -> anyhow::Result<()> {
     let message = message_encode(args, streamer_message.block.header.height, &streamer_message);
     message_publish(args, nats_connection, &message);
-    message_dump(Some(VerbosityLevel::WithBlockHashHeight), streamer_message);
+//  message_dump(Some(VerbosityLevel::WithBlockHashHeight), streamer_message);
     Ok(())
 }
 

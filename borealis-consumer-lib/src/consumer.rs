@@ -34,7 +34,7 @@ pub(crate) struct RunArgs {
 
 impl Default for RunArgs {
     fn default() -> Self {
-        Self
+        todo!() // Self {}
     }
 }
 
@@ -48,9 +48,10 @@ pub(crate) enum WorkMode {
 impl FromStr for WorkMode {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "Subscriber" | "subscriber" => Ok(WorkMode::Subscriber),
-            "JetStream" | "Jetstream" | "jetstream" => Ok(WorkMode::Jetstream),
+        let input = s.to_lowercase();
+        match input.as_str() {
+            "subscriber" => Ok(WorkMode::Subscriber),
+            "jetstream" => Ok(WorkMode::Jetstream),
             _ => Err("Unknown consumer work mode: `--work-mode` should be `Subscriber` or `JetStream`".to_string().into()),
         }
     }
@@ -59,17 +60,27 @@ impl FromStr for WorkMode {
 /// Consuming messages format (should be upper case, 'cause it's a suffix for `subject` name, and NATS subject is case sensitive)
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum MsgFormat {
-    CBOR,
-    JSON,
+    Cbor,
+    Json,
 }
 
 impl FromStr for MsgFormat {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "CBOR" | "Cbor" | "cbor" => Ok(MsgFormat::CBOR),
-            "JSON" | "Json" | "json" => Ok(MsgFormat::JSON),
+        let input = s.to_lowercase();
+        match input.as_str() {
+            "cbor" => Ok(MsgFormat::Cbor),
+            "json" => Ok(MsgFormat::Json),
             _ => Err("Unknown message format: `--msg-fomat` should contain `CBOR` or `JSON`".to_string().into()),
+        }
+    }
+}
+
+impl ToString for MsgFormat {
+    fn to_string(&self) -> String {
+        match self {
+            MsgFormat::Cbor => String::from("CBOR"),
+            MsgFormat::Json => String::from("JSON"),
         }
     }
 }
@@ -88,10 +99,11 @@ pub enum VerbosityLevel {
 impl FromStr for VerbosityLevel {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "0" | "WithBlockHashHeight" | "Withblockhashheight" | "withblockhashheight" => Ok(VerbosityLevel::WithBlockHashHeight),
-            "1" | "WithStreamerMessageDump" | "Withstreamermessagedump" | "withstreamermessagedump" => Ok(VerbosityLevel::WithStreamerMessageDump),
-            "2" | "WithStreamerMessageParse" | "Withstreamermessageparse" | "withstreamermessageparse" => Ok(VerbosityLevel::WithStreamerMessageParse),
+        let input = s.to_lowercase();
+        match input.as_str() {
+            "0" | "withblockhashheight" => Ok(VerbosityLevel::WithBlockHashHeight),
+            "1" | "withstreamermessagedump" => Ok(VerbosityLevel::WithStreamerMessageDump),
+            "2" | "withstreamermessageparse" => Ok(VerbosityLevel::WithStreamerMessageParse),
             _ => Err("Unknown output verbosity level: `--verbose` should be `WithBlockHashHeight` (`0`), `WithStreamerMessageDump` (`1`) or `WithStreamerMessageParse` (`2`)".to_string().into()),
         }
     }
@@ -114,13 +126,13 @@ impl From/Into<cli::RunArgs> for lib::RunArgs
 */
 
 pub trait Consumer {
-    fn nats_connect(&self) -> nats::Connection;
-    fn nats_check_connection(&self, nats_connection: nats::Connection);
+    fn nats_connect(self) -> nats::Connection;
+    fn nats_check_connection(nats_connection: &nats::Connection);
 }
 
 impl Consumer for RunArgs {
     /// Create connection to Borealis NATS Bus
-    fn nats_connect(&self) -> nats::Connection {
+    fn nats_connect(self) -> nats::Connection {
         let creds_path = self
             .creds_path
             .unwrap_or(std::path::PathBuf::from("./.nats/seed/nats.creds"));
@@ -232,7 +244,7 @@ impl Consumer for RunArgs {
     }
 
     /// Check connection to Borealis NATS Bus
-    fn nats_check_connection(&self, nats_connection: nats::Connection) {
+    fn nats_check_connection(nats_connection: &nats::Connection) {
     //  info!(target: "borealis_consumer", "NATS Connection: {:?}", nats_connection);
         info!(target: "borealis_consumer", "round trip time (rtt) between this client and the current NATS server: {:?}", nats_connection.rtt());
         info!(target: "borealis_consumer", "this client IP address, as known by the current NATS server: {:?}", nats_connection.client_ip());
