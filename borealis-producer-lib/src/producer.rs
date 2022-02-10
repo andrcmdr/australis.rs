@@ -12,6 +12,8 @@ use anyhow::Result;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
+use async_trait::async_trait;
+
 use near_indexer::near_primitives::types::Gas;
 
 use core::str::FromStr;
@@ -242,353 +244,372 @@ pub fn init_logging() {
 }
 
 /// Indexer's methods for Indexer as Producer for Borealis NATS Bus
-
-/// Initialize Indexer's configurations
-pub fn init(args: InitConfigArgs, home_path: Option<std::path::PathBuf>) {
-    // let home_dir = home_path.unwrap_or(std::path::PathBuf::from(near_indexer::get_default_home()));
-    let home_dir = home_path
-        .unwrap_or(std::path::PathBuf::from("./.borealis-indexer"));
-    
-    near_indexer::indexer_init_configs(&home_dir, args.into()).expect("Error while creating Indexer's initial configuration files");
+pub trait Indexer {
+    fn init(&self, home_path: Option<std::path::PathBuf>);
 }
 
-/// Producer's methods for Borealis NATS Bus
+impl Indexer for InitConfigArgs {
+    /// Initialize Indexer's configurations
+    fn init(&self, home_path: Option<std::path::PathBuf>) {
+        // let home_dir = home_path.unwrap_or(std::path::PathBuf::from(near_indexer::get_default_home()));
+        let home_dir = home_path
+            .unwrap_or(std::path::PathBuf::from("./.borealis-indexer"));
 
-/// Create connection to Borealis NATS Bus
-pub fn nats_connect(args: RunArgs) -> nats::Connection {
-    let creds_path = args
-        .creds_path
-        .unwrap_or(std::path::PathBuf::from("./.nats/seed/nats.creds"));
-
-    let options = match (
-        args.root_cert_path,
-        args.client_cert_path,
-        args.client_private_key,
-    ) {
-        (Some(root_cert_path), None, None) => {
-            nats::Options::with_credentials(creds_path)
-                .with_name("Borealis Indexer [TLS, Server Auth]")
-                .tls_required(true)
-                .add_root_certificate(root_cert_path)
-                .reconnect_buffer_size(1024 * 1024 * 1024)
-                .max_reconnects(100000)
-                .reconnect_callback(|| info!(target: "borealis_indexer", "connection has been reestablished"))
-                .reconnect_delay_callback(|reconnect_try| {
-                    let reconnect_attempt = {
-                        if reconnect_try == 0 {
-                            1 as usize
-                        } else {
-                            reconnect_try
-                        }
-                    };
-                    let delay = core::time::Duration::from_millis(std::cmp::min(
-                        (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
-                            as u64,
-                        1000,
-                    ));
-                    info!(
-                        target: "borealis_indexer",
-                        "reconnection attempt #{} within delay of {:?} ...",
-                        reconnect_attempt, delay
-                    );
-                    delay
-                })
-                .disconnect_callback(|| info!(target: "borealis_indexer", "connection has been lost")) // todo: re-run message producer
-                .close_callback(|| info!(target: "borealis_indexer", "connection has been closed")) // todo: re-run message producer
-        }
-        (Some(root_cert_path), Some(client_cert_path), Some(client_private_key)) => {
-            nats::Options::with_credentials(creds_path)
-                .with_name("Borealis Indexer [TLS, Server Auth, Client Auth]")
-                .tls_required(true)
-                .add_root_certificate(root_cert_path)
-                .client_cert(client_cert_path, client_private_key)
-                .reconnect_buffer_size(1024 * 1024 * 1024)
-                .max_reconnects(100000)
-                .reconnect_callback(|| info!(target: "borealis_indexer", "connection has been reestablished"))
-                .reconnect_delay_callback(|reconnect_try| {
-                    let reconnect_attempt = {
-                        if reconnect_try == 0 {
-                            1 as usize
-                        } else {
-                            reconnect_try
-                        }
-                    };
-                    let delay = core::time::Duration::from_millis(std::cmp::min(
-                        (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
-                            as u64,
-                        1000,
-                    ));
-                    info!(
-                        target: "borealis_indexer",
-                        "reconnection attempt #{} within delay of {:?} ...",
-                        reconnect_attempt, delay
-                    );
-                    delay
-                })
-                .disconnect_callback(|| info!(target: "borealis_indexer", "connection has been lost")) // todo: re-run message producer
-                .close_callback(|| info!(target: "borealis_indexer", "connection has been closed")) // todo: re-run message producer
-        }
-        _ => {
-            nats::Options::with_credentials(creds_path)
-                .with_name("Borealis Indexer [NATS, without TLS]")
-                .reconnect_buffer_size(1024 * 1024 * 1024)
-                .max_reconnects(100000)
-                .reconnect_callback(|| info!(target: "borealis_indexer", "connection has been reestablished"))
-                .reconnect_delay_callback(|reconnect_try| {
-                    let reconnect_attempt = {
-                        if reconnect_try == 0 {
-                            1 as usize
-                        } else {
-                            reconnect_try
-                        }
-                    };
-                    let delay = core::time::Duration::from_millis(std::cmp::min(
-                        (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
-                            as u64,
-                        1000,
-                    ));
-                    info!(
-                        target: "borealis_indexer",
-                        "reconnection attempt #{} within delay of {:?} ...",
-                        reconnect_attempt, delay
-                    );
-                    delay
-                })
-                .disconnect_callback(|| info!(target: "borealis_indexer", "connection has been lost")) // todo: re-run message producer
-                .close_callback(|| info!(target: "borealis_indexer", "connection has been closed")) // todo: re-run message producer
-        }
-    };
-
-    let nats_connection = options
-        .connect(args.nats_server.as_str())
-        .expect("NATS connection error or wrong credentials");
-
-    nats_connection
-}
-
-/// Check connection to Borealis NATS Bus
-pub fn nats_check_connection(nats_connection: &nats::Connection) {
-//  info!(target: "borealis_indexer", "NATS Connection: {:?}", nats_connection);
-    info!(target: "borealis_indexer", "round trip time (rtt) between this client and the current NATS server: {:?}", nats_connection.rtt());
-    info!(target: "borealis_indexer", "this client IP address, as known by the current NATS server: {:?}", nats_connection.client_ip());
-    info!(target: "borealis_indexer", "this client ID, as known by the current NATS server: {:?}", nats_connection.client_id());
-    info!(target: "borealis_indexer", "maximum payload size the current NATS server will accept: {:?}", nats_connection.max_payload());
-}
-
-/// Create Borealis Message with payload
-pub fn message_encode<T: Serialize>(args: &RunArgs, msg_seq_id: u64, payload: &T) -> Vec<u8> {
-    match args.msg_format {
-        MsgFormat::Cbor => {
-            BorealisMessage::new(
-                msg_seq_id,
-                payload,
-            ).to_cbor()
-        }
-        MsgFormat::Json => {
-            BorealisMessage::new(
-                msg_seq_id,
-                payload,
-            ).to_json_bytes()
-        }
+        near_indexer::indexer_init_configs(&home_dir, self.to_owned().into()).expect("Error while creating Indexer's initial configuration files");
     }
 }
 
-/// Publish (transfer) message to Borealis NATS Bus
-pub fn message_publish<T: AsRef<[u8]>>(args: &RunArgs, nats_connection: &nats::Connection, message: &T) {
-    nats_connection.publish(
-        format!("{}_{}", args.subject, args.msg_format.to_string()).as_str(),
-        message,
-    )
-    .expect(format!("[Message as {} encoded bytes vector] Message passing error", args.msg_format.to_string()).as_str());
+/// Producer's methods for Borealis NATS Bus
+#[async_trait]
+pub trait Producer {
+    fn nats_connect(self) -> nats::Connection;
+    fn nats_check_connection(&self, nats_connection: &nats::Connection);
+    fn message_encode<T: Serialize>(&self, msg_seq_id: u64, payload: &T) -> Vec<u8>;
+    fn message_publish<T: AsRef<[u8]>>(&self, nats_connection: &nats::Connection, message: &T);
+    fn run(&self, home_path: Option<std::path::PathBuf>);
+    async fn listen_events(&self, events_stream: mpsc::Receiver<near_indexer::StreamerMessage>, nats_connection: &nats::Connection);
+    async fn handle_message(&self, streamer_message: near_indexer::StreamerMessage, nats_connection: &nats::Connection) -> anyhow::Result<()>;
+    fn message_dump(&self, verbosity_level: Option<VerbosityLevel>, streamer_message: near_indexer::StreamerMessage);
 }
 
-///Run Borealis Indexer as Borealis NATS Bus Producer
-pub fn run(args: &RunArgs, home_path: Option<std::path::PathBuf>) {
-    // let home_dir = home_path.unwrap_or(std::path::PathBuf::from(near_indexer::get_default_home()));
-    let home_dir = home_path
-        .unwrap_or(std::path::PathBuf::from("./.borealis-indexer"));
+#[async_trait]
+impl Producer for RunArgs {
+    /// Create connection to Borealis NATS Bus
+    fn nats_connect(self) -> nats::Connection {
+        let creds_path = self
+            .creds_path
+            .unwrap_or(std::path::PathBuf::from("./.nats/seed/nats.creds"));
 
-    let indexer_config = near_indexer::IndexerConfig {
-        home_dir,
-        // recover and continue message streaming from latest synced block (real-time), or from interruption, or from exact block height
-        sync_mode: match args.sync_mode {
-            SyncMode::LatestSynced => near_indexer::SyncModeEnum::LatestSynced,
-            SyncMode::FromInterruption => near_indexer::SyncModeEnum::FromInterruption,
-            SyncMode::BlockHeight => near_indexer::SyncModeEnum::BlockHeight(args.block_height.unwrap_or(0)),
-        },
-        // waiting for full sync or stream messages while syncing
-        await_for_node_synced: match args.await_synced {
-            AwaitSynced::WaitForFullSync => near_indexer::AwaitForNodeSyncedEnum::WaitForFullSync,
-            AwaitSynced::StreamWhileSyncing => near_indexer::AwaitForNodeSyncedEnum::StreamWhileSyncing,
-        },
-    };
+        let options = match (
+            self.root_cert_path,
+            self.client_cert_path,
+            self.client_private_key,
+        ) {
+            (Some(root_cert_path), None, None) => {
+                nats::Options::with_credentials(creds_path)
+                    .with_name("Borealis Indexer [TLS, Server Auth]")
+                    .tls_required(true)
+                    .add_root_certificate(root_cert_path)
+                    .reconnect_buffer_size(1024 * 1024 * 1024)
+                    .max_reconnects(100000)
+                    .reconnect_callback(|| info!(target: "borealis_indexer", "connection has been reestablished"))
+                    .reconnect_delay_callback(|reconnect_try| {
+                        let reconnect_attempt = {
+                            if reconnect_try == 0 {
+                                1 as usize
+                            } else {
+                                reconnect_try
+                            }
+                        };
+                        let delay = core::time::Duration::from_millis(std::cmp::min(
+                            (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
+                                as u64,
+                            1000,
+                        ));
+                        info!(
+                            target: "borealis_indexer",
+                            "reconnection attempt #{} within delay of {:?} ...",
+                            reconnect_attempt, delay
+                        );
+                        delay
+                    })
+                    .disconnect_callback(|| info!(target: "borealis_indexer", "connection has been lost")) // todo: re-run message producer
+                    .close_callback(|| info!(target: "borealis_indexer", "connection has been closed")) // todo: re-run message producer
+            }
+            (Some(root_cert_path), Some(client_cert_path), Some(client_private_key)) => {
+                nats::Options::with_credentials(creds_path)
+                    .with_name("Borealis Indexer [TLS, Server Auth, Client Auth]")
+                    .tls_required(true)
+                    .add_root_certificate(root_cert_path)
+                    .client_cert(client_cert_path, client_private_key)
+                    .reconnect_buffer_size(1024 * 1024 * 1024)
+                    .max_reconnects(100000)
+                    .reconnect_callback(|| info!(target: "borealis_indexer", "connection has been reestablished"))
+                    .reconnect_delay_callback(|reconnect_try| {
+                        let reconnect_attempt = {
+                            if reconnect_try == 0 {
+                                1 as usize
+                            } else {
+                                reconnect_try
+                            }
+                        };
+                        let delay = core::time::Duration::from_millis(std::cmp::min(
+                            (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
+                                as u64,
+                            1000,
+                        ));
+                        info!(
+                            target: "borealis_indexer",
+                            "reconnection attempt #{} within delay of {:?} ...",
+                            reconnect_attempt, delay
+                        );
+                        delay
+                    })
+                    .disconnect_callback(|| info!(target: "borealis_indexer", "connection has been lost")) // todo: re-run message producer
+                    .close_callback(|| info!(target: "borealis_indexer", "connection has been closed")) // todo: re-run message producer
+            }
+            _ => {
+                nats::Options::with_credentials(creds_path)
+                    .with_name("Borealis Indexer [NATS, without TLS]")
+                    .reconnect_buffer_size(1024 * 1024 * 1024)
+                    .max_reconnects(100000)
+                    .reconnect_callback(|| info!(target: "borealis_indexer", "connection has been reestablished"))
+                    .reconnect_delay_callback(|reconnect_try| {
+                        let reconnect_attempt = {
+                            if reconnect_try == 0 {
+                                1 as usize
+                            } else {
+                                reconnect_try
+                            }
+                        };
+                        let delay = core::time::Duration::from_millis(std::cmp::min(
+                            (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
+                                as u64,
+                            1000,
+                        ));
+                        info!(
+                            target: "borealis_indexer",
+                            "reconnection attempt #{} within delay of {:?} ...",
+                            reconnect_attempt, delay
+                        );
+                        delay
+                    })
+                    .disconnect_callback(|| info!(target: "borealis_indexer", "connection has been lost")) // todo: re-run message producer
+                    .close_callback(|| info!(target: "borealis_indexer", "connection has been closed")) // todo: re-run message producer
+            }
+        };
 
-    let nats_connection = nats_connect(args.to_owned());
+        let nats_connection = options
+            .connect(self.nats_server.as_str())
+            .expect("NATS connection error or wrong credentials");
 
-    let system = actix::System::new();
-    system.block_on(async move {
-        let indexer = near_indexer::Indexer::new(indexer_config).expect("Error while creating Indexer instance");
-        let events_stream = indexer.streamer();
-        listen_events(args, events_stream, &nats_connection).await;
-        actix::System::current().stop();
-    });
-    system.run().unwrap();
-}
+        nats_connection
+    }
 
-/// Listen Indexer's state events and receive `StreamerMessages` with information about finalized blocks
-pub async fn listen_events(args: &RunArgs, events_stream: mpsc::Receiver<near_indexer::StreamerMessage>, nats_connection: &nats::Connection) {
-    info!(
-        target: "borealis_indexer",
-        "Message producer loop started: listening for new messages\n"
-    );
-    let mut handle_messages = tokio_stream::wrappers::ReceiverStream::new(events_stream).map(|streamer_message| async {
+    /// Check connection to Borealis NATS Bus
+    fn nats_check_connection(&self, nats_connection: &nats::Connection) {
+    //  info!(target: "borealis_indexer", "NATS Connection: {:?}", nats_connection);
+        info!(target: "borealis_indexer", "round trip time (rtt) between this client and the current NATS server: {:?}", nats_connection.rtt());
+        info!(target: "borealis_indexer", "this client IP address, as known by the current NATS server: {:?}", nats_connection.client_ip());
+        info!(target: "borealis_indexer", "this client ID, as known by the current NATS server: {:?}", nats_connection.client_id());
+        info!(target: "borealis_indexer", "maximum payload size the current NATS server will accept: {:?}", nats_connection.max_payload());
+    }
+
+    /// Create Borealis Message with payload
+    fn message_encode<T: Serialize>(&self, msg_seq_id: u64, payload: &T) -> Vec<u8> {
+        match self.msg_format {
+            MsgFormat::Cbor => {
+                BorealisMessage::new(
+                    msg_seq_id,
+                    payload,
+                ).to_cbor()
+            }
+            MsgFormat::Json => {
+                BorealisMessage::new(
+                    msg_seq_id,
+                    payload,
+                ).to_json_bytes()
+            }
+        }
+    }
+
+    /// Publish (transfer) message to Borealis NATS Bus
+    fn message_publish<T: AsRef<[u8]>>(&self, nats_connection: &nats::Connection, message: &T) {
+        nats_connection.publish(
+            format!("{}_{}", self.subject, self.msg_format.to_string()).as_str(),
+            message,
+        )
+        .expect(format!("[Message as {} encoded bytes vector] Message passing error", self.msg_format.to_string()).as_str());
+    }
+
+    ///Run Borealis Indexer as Borealis NATS Bus Producer
+    fn run(&self, home_path: Option<std::path::PathBuf>) {
+        // let home_dir = home_path.unwrap_or(std::path::PathBuf::from(near_indexer::get_default_home()));
+        let home_dir = home_path
+            .unwrap_or(std::path::PathBuf::from("./.borealis-indexer"));
+
+        let indexer_config = near_indexer::IndexerConfig {
+            home_dir,
+            // recover and continue message streaming from latest synced block (real-time), or from interruption, or from exact block height
+            sync_mode: match self.sync_mode {
+                SyncMode::LatestSynced => near_indexer::SyncModeEnum::LatestSynced,
+                SyncMode::FromInterruption => near_indexer::SyncModeEnum::FromInterruption,
+                SyncMode::BlockHeight => near_indexer::SyncModeEnum::BlockHeight(self.block_height.unwrap_or(0)),
+            },
+            // waiting for full sync or stream messages while syncing
+            await_for_node_synced: match self.await_synced {
+                AwaitSynced::WaitForFullSync => near_indexer::AwaitForNodeSyncedEnum::WaitForFullSync,
+                AwaitSynced::StreamWhileSyncing => near_indexer::AwaitForNodeSyncedEnum::StreamWhileSyncing,
+            },
+        };
+
+        let nats_connection = self.to_owned().nats_connect();
+
+        let system = actix::System::new();
+        system.block_on(async move {
+            let indexer = near_indexer::Indexer::new(indexer_config).expect("Error while creating Indexer instance");
+            let events_stream = indexer.streamer();
+            self.listen_events(events_stream, &nats_connection).await;
+            actix::System::current().stop();
+        });
+        system.run().unwrap();
+    }
+
+    /// Listen Indexer's state events and receive `StreamerMessages` with information about finalized blocks
+    async fn listen_events(&self, events_stream: mpsc::Receiver<near_indexer::StreamerMessage>, nats_connection: &nats::Connection) {
         info!(
             target: "borealis_indexer",
-            "Message producer loop executed: message received\n"
+            "Message producer loop started: listening for new messages\n"
         );
-        info!(
-            target: "borealis_indexer",
-            "block_height: #{}, block_hash: {}\n",
-            &streamer_message.block.header.height,
-            &streamer_message.block.header.hash
-        );
-        handle_message(args, streamer_message, nats_connection).await.map_err(|e| println!("Error: {}", e))
-    });
-    while let Some(_handled_message) = handle_messages.next().await {}
-    // Graceful shutdown
-    info!(target: "borealis_indexer", "Indexer will be shutted down gracefully in 10 seconds...");
-    drop(handle_messages);
-    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-}
-
-/// Handle Indexer's state events/messages (`StreamerMessages`) about finalized blocks
-pub async fn handle_message(args: &RunArgs, streamer_message: near_indexer::StreamerMessage, nats_connection: &nats::Connection) -> anyhow::Result<()> {
-    let message = message_encode(args, streamer_message.block.header.height, &streamer_message);
-    message_publish(args, nats_connection, &message);
-//  message_dump(Some(VerbosityLevel::WithBlockHashHeight), streamer_message);
-    Ok(())
-}
-
-/// Dump information from Indexer's state events/messages (`StreamerMessages`) about finalized blocks
-pub fn message_dump(verbosity_level: Option<VerbosityLevel>, streamer_message: near_indexer::StreamerMessage) {
-    // Data handling from `StreamerMessage` data structure. For custom filtering purposes.
-    // Same as: jq '{block_height: .block.header.height, block_hash: .block.header.hash, block_header_chunk: .block.chunks[0], shard_chunk_header: .shards[0].chunk.header, transactions: .shards[0].chunk.transactions, receipts: .shards[0].chunk.receipts, receipt_execution_outcomes: .shards[0].receipt_execution_outcomes, state_changes: .state_changes}'
-
-    if let Some(_verbosity_level) = verbosity_level {
-        println!(
-            "block_height: #{}, block_hash: {}\n",
-            &streamer_message.block.header.height, &streamer_message.block.header.hash
-        );
-    };
-
-    if let Some(VerbosityLevel::WithStreamerMessageDump) | Some(VerbosityLevel::WithStreamerMessageParse) = verbosity_level {
-        println!(
-            "streamer_message: {}\n",
-            serde_json::to_string_pretty(&streamer_message).unwrap()
-        );
-        println!(
-            "streamer_message: {}\n",
-            serde_json::to_string(&streamer_message).unwrap()
-        );
-    };
-
-    if let Some(VerbosityLevel::WithStreamerMessageParse) = verbosity_level {
-        println!(
-            "streamer_message: {}\n",
-            serde_json::to_value(&streamer_message).unwrap()
-        );
-        println!(
-            "streamer_message: {:?}\n",
-            cbor::to_vec(&streamer_message).unwrap()
-        );
-
-        println!(
-            "block_header: {}\n",
-            serde_json::to_value(&streamer_message.block.header).unwrap()
-        );
-        println!(
-            "block_header: {:?}\n",
-            cbor::to_vec(&streamer_message.block.header).unwrap()
-        );
-
-        println!(
-            "block_header_chunks#: {}\n",
-            streamer_message.block.chunks.len()
-        );
-        streamer_message.block.chunks.iter().for_each(|chunk| {
-            println!(
-                "block_header_chunk: {}\n",
-                serde_json::to_value(&chunk).unwrap()
+        let mut handle_messages = tokio_stream::wrappers::ReceiverStream::new(events_stream).map(|streamer_message| async {
+            info!(
+                target: "borealis_indexer",
+                "Message producer loop executed: message received\n"
             );
-            println!("block_header_chunk: {:?}\n", cbor::to_vec(&chunk).unwrap());
+            info!(
+                target: "borealis_indexer",
+                "block_height: #{}, block_hash: {}\n",
+                &streamer_message.block.header.height,
+                &streamer_message.block.header.hash
+            );
+            self.handle_message(streamer_message, nats_connection).await.map_err(|e| println!("Error: {}", e))
         });
+        while let Some(_handled_message) = handle_messages.next().await {}
+        // Graceful shutdown
+        info!(target: "borealis_indexer", "Indexer will be shutted down gracefully in 10 seconds...");
+        drop(handle_messages);
+        tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+    }
 
-        println!("shards#: {}\n", streamer_message.shards.len());
-        streamer_message.shards.iter().for_each(|shard| {
-            if let Some(chunk) = &shard.chunk {
-                println!(
-                    "shard_chunk_header: {}\n",
-                    serde_json::to_value(&chunk.header).unwrap()
-                );
-                println!(
-                    "shard_chunk_header: {:?}\n",
-                    cbor::to_vec(&chunk.header).unwrap()
-                );
+    /// Handle Indexer's state events/messages (`StreamerMessages`) about finalized blocks
+    async fn handle_message(&self, streamer_message: near_indexer::StreamerMessage, nats_connection: &nats::Connection) -> anyhow::Result<()> {
+        let message = self.message_encode(streamer_message.block.header.height, &streamer_message);
+        self.message_publish(nats_connection, &message);
+        self.message_dump(Some(VerbosityLevel::WithBlockHashHeight), streamer_message);
+        Ok(())
+    }
 
-                println!("shard_chunk_transactions#: {}\n", chunk.transactions.len());
-                println!(
-                    "shard_chunk_transactions: {}\n",
-                    serde_json::to_value(&chunk.transactions).unwrap()
-                );
-                println!(
-                    "shard_chunk_transactions: {:?}\n",
-                    cbor::to_vec(&chunk.transactions).unwrap()
-                );
+    /// Dump information from Indexer's state events/messages (`StreamerMessages`) about finalized blocks
+    fn message_dump(&self, verbosity_level: Option<VerbosityLevel>, streamer_message: near_indexer::StreamerMessage) {
+        // Data handling from `StreamerMessage` data structure. For custom filtering purposes.
+        // Same as: jq '{block_height: .block.header.height, block_hash: .block.header.hash, block_header_chunk: .block.chunks[0], shard_chunk_header: .shards[0].chunk.header, transactions: .shards[0].chunk.transactions, receipts: .shards[0].chunk.receipts, receipt_execution_outcomes: .shards[0].receipt_execution_outcomes, state_changes: .state_changes}'
 
-                println!("shard_chunk_receipts#: {}\n", chunk.receipts.len());
-                println!(
-                    "shard_chunk_receipts: {}\n",
-                    serde_json::to_value(&chunk.receipts).unwrap()
-                );
-                println!(
-                    "shard_chunk_receipts: {:?}\n",
-                    cbor::to_vec(&chunk.receipts).unwrap()
-                );
-            } else {
-                println!("shard_chunk_header: None\n");
-
-                println!("shard_chunk_transactions#: None\n");
-                println!("shard_chunk_transactions: None\n");
-
-                println!("shard_chunk_receipts#: None\n");
-                println!("shard_chunk_receipts: None\n");
-            };
-
+        if let Some(_verbosity_level) = verbosity_level {
             println!(
-                "shard_receipt_execution_outcomes#: {}\n",
-                shard.receipt_execution_outcomes.len()
+                "block_height: #{}, block_hash: {}\n",
+                &streamer_message.block.header.height, &streamer_message.block.header.hash
+            );
+        };
+
+        if let Some(VerbosityLevel::WithStreamerMessageDump) | Some(VerbosityLevel::WithStreamerMessageParse) = verbosity_level {
+            println!(
+                "streamer_message: {}\n",
+                serde_json::to_string_pretty(&streamer_message).unwrap()
             );
             println!(
-                "shard_receipt_execution_outcomes: {}\n",
-                serde_json::to_value(&shard.receipt_execution_outcomes).unwrap()
+                "streamer_message: {}\n",
+                serde_json::to_string(&streamer_message).unwrap()
+            );
+        };
+
+        if let Some(VerbosityLevel::WithStreamerMessageParse) = verbosity_level {
+            println!(
+                "streamer_message: {}\n",
+                serde_json::to_value(&streamer_message).unwrap()
             );
             println!(
-                "shard_receipt_execution_outcomes: {:?}\n",
-                cbor::to_vec(&shard.receipt_execution_outcomes).unwrap()
+                "streamer_message: {:?}\n",
+                cbor::to_vec(&streamer_message).unwrap()
             );
-        });
 
-        println!("StateChanges#: {}\n", streamer_message.state_changes.len());
-        streamer_message
-            .state_changes
-            .iter()
-            .for_each(|state_change| {
+            println!(
+                "block_header: {}\n",
+                serde_json::to_value(&streamer_message.block.header).unwrap()
+            );
+            println!(
+                "block_header: {:?}\n",
+                cbor::to_vec(&streamer_message.block.header).unwrap()
+            );
+
+            println!(
+                "block_header_chunks#: {}\n",
+                streamer_message.block.chunks.len()
+            );
+            streamer_message.block.chunks.iter().for_each(|chunk| {
                 println!(
-                    "StateChange: {}\n",
-                    serde_json::to_value(&state_change).unwrap()
+                    "block_header_chunk: {}\n",
+                    serde_json::to_value(&chunk).unwrap()
                 );
-                println!("StateChange: {:?}\n", cbor::to_vec(&state_change).unwrap());
+                println!("block_header_chunk: {:?}\n", cbor::to_vec(&chunk).unwrap());
             });
-    };
+
+            println!("shards#: {}\n", streamer_message.shards.len());
+            streamer_message.shards.iter().for_each(|shard| {
+                if let Some(chunk) = &shard.chunk {
+                    println!(
+                        "shard_chunk_header: {}\n",
+                        serde_json::to_value(&chunk.header).unwrap()
+                    );
+                    println!(
+                        "shard_chunk_header: {:?}\n",
+                        cbor::to_vec(&chunk.header).unwrap()
+                    );
+
+                    println!("shard_chunk_transactions#: {}\n", chunk.transactions.len());
+                    println!(
+                        "shard_chunk_transactions: {}\n",
+                        serde_json::to_value(&chunk.transactions).unwrap()
+                    );
+                    println!(
+                        "shard_chunk_transactions: {:?}\n",
+                        cbor::to_vec(&chunk.transactions).unwrap()
+                    );
+
+                    println!("shard_chunk_receipts#: {}\n", chunk.receipts.len());
+                    println!(
+                        "shard_chunk_receipts: {}\n",
+                        serde_json::to_value(&chunk.receipts).unwrap()
+                    );
+                    println!(
+                        "shard_chunk_receipts: {:?}\n",
+                        cbor::to_vec(&chunk.receipts).unwrap()
+                    );
+                } else {
+                    println!("shard_chunk_header: None\n");
+
+                    println!("shard_chunk_transactions#: None\n");
+                    println!("shard_chunk_transactions: None\n");
+
+                    println!("shard_chunk_receipts#: None\n");
+                    println!("shard_chunk_receipts: None\n");
+                };
+
+                println!(
+                    "shard_receipt_execution_outcomes#: {}\n",
+                    shard.receipt_execution_outcomes.len()
+                );
+                println!(
+                    "shard_receipt_execution_outcomes: {}\n",
+                    serde_json::to_value(&shard.receipt_execution_outcomes).unwrap()
+                );
+                println!(
+                    "shard_receipt_execution_outcomes: {:?}\n",
+                    cbor::to_vec(&shard.receipt_execution_outcomes).unwrap()
+                );
+            });
+
+            println!("StateChanges#: {}\n", streamer_message.state_changes.len());
+            streamer_message
+                .state_changes
+                .iter()
+                .for_each(|state_change| {
+                    println!(
+                        "StateChange: {}\n",
+                        serde_json::to_value(&state_change).unwrap()
+                    );
+                    println!("StateChange: {:?}\n", cbor::to_vec(&state_change).unwrap());
+                });
+        };
+    }
 }
 
