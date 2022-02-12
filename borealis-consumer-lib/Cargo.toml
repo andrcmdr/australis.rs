@@ -5,8 +5,8 @@ authors = ["Aurora <hello@aurora.dev>"]
 edition = "2021"
 # rust-version = "1.58.1"
 description = "Library for creating NATS consumers for Borealis Bus, NATS based service-oriented bus (MOM/MQ)."
-homepage = "https://github.com/aurora-is-near/borealis-indexer"
-repository = "https://github.com/aurora-is-near/borealis-indexer"
+homepage = "https://github.com/aurora-is-near/borealis.rs"
+repository = "https://github.com/aurora-is-near/borealis.rs"
 license = "GPLv3"
 # license-file = "LICENSE"
 publish = false
@@ -15,7 +15,7 @@ publish = false
 crate-type = ["rlib"]
 
 [dependencies]
-near-indexer = { path = "../near-indexer" }
+near-indexer = { git = "ssh://git@github.com/aurora-is-near/borealis-indexer.git", rev = "0b0a3dbe457bdf750813c8aa01045c448d4c4687" }
 borealis-types = { path = "../borealis-types" }
 nats = "0.16.0"
 

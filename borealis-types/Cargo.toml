@@ -4,8 +4,8 @@ version = "0.1.0"
 authors = ["Aurora <hello@aurora.dev>"]
 edition = "2021"
 description = "Definition of message types (`BorealisMessage` and `StreamerMessage`), sent over the wire by the Borealis Indexer (producer for the Borealis NATS Bus), and implementation of methods to encode and decode messages of these types."
-homepage = "https://github.com/aurora-is-near/borealis-indexer"
-repository = "https://github.com/aurora-is-near/borealis-indexer"
+homepage = "https://github.com/aurora-is-near/borealis.rs"
+repository = "https://github.com/aurora-is-near/borealis.rs"
 license = "GPLv3"
 publish = false
 
