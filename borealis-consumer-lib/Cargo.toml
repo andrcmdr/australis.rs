@@ -18,9 +18,7 @@ crate-type = ["rlib"]
 near-indexer = { git = "ssh://git@github.com/aurora-is-near/borealis-indexer.git", rev = "0b0a3dbe457bdf750813c8aa01045c448d4c4687" }
 borealis-types = { path = "../borealis-types" }
 nats = "0.16.0"
-
-clap = "3.0.0-beta.1"
-openssl-probe = "0.1.2"
+chrono = "0.4.19"
 
 actix = "=0.11.0-beta.2"
 tokio = { version = "1.1", features = ["sync"] }
@@ -28,7 +26,7 @@ tokio = { version = "1.1", features = ["sync"] }
 tracing = "0.1.13"
 tracing-subscriber = "0.2.4"
 
-# serde = { version = "1", features = [ "derive" ] }
+serde = { version = "1", features = [ "derive" ] }
 serde_json = "1.0.55"
 serde_cbor = "0.11.2"
 

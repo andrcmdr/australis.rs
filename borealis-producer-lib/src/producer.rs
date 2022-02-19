@@ -22,7 +22,7 @@ pub type Error = Box<dyn std::error::Error + 'static>;
 
 /// Options to run NATS Producer and Borealis Indexer
 #[derive(Debug, Clone)]
-pub struct RunArgs {
+pub struct Context {
     /// root CA certificate
     pub root_cert_path: Option<std::path::PathBuf>,
     /// client certificate
@@ -48,7 +48,7 @@ pub struct RunArgs {
     pub await_synced: AwaitSynced,
 }
 
-impl Default for RunArgs {
+impl Default for Context {
     fn default() -> Self {
         Self {
             root_cert_path: Some(std::path::PathBuf::from("./.nats/seed/root-ca.crt")),
@@ -100,7 +100,7 @@ pub enum SyncMode {
     LatestSynced,
     /// Starts syncing from the block NEAR Indexer was interrupted last time
     FromInterruption,
-    /// Specific block height to start syncing from, RunArgs.block_height should follow after it
+    /// Specific block height to start syncing from, Context.block_height should follow after it
     BlockHeight,
 }
 
@@ -259,31 +259,109 @@ impl Indexer for InitConfigArgs {
     }
 }
 
-/// Producer's methods for Borealis NATS Bus
-#[async_trait]
-pub trait Producer {
-    fn nats_connect(self) -> nats::Connection;
-    fn nats_check_connection(&self, nats_connection: &nats::Connection);
-    fn message_encode<T: Serialize>(&self, msg_seq_id: u64, payload: &T) -> Vec<u8>;
-    fn message_publish<T: AsRef<[u8]>>(&self, nats_connection: &nats::Connection, message: &T);
-    fn run(&self, home_path: Option<std::path::PathBuf>);
-    async fn listen_events(&self, events_stream: mpsc::Receiver<near_indexer::StreamerMessage>, nats_connection: &nats::Connection);
-    async fn handle_message(&self, streamer_message: near_indexer::StreamerMessage, nats_connection: &nats::Connection) -> anyhow::Result<()>;
-    fn message_dump(&self, verbosity_level: Option<VerbosityLevel>, streamer_message: near_indexer::StreamerMessage);
+impl Producer for Context
+where Self: Send + Sync + Sized + Clone + ToOwned {
+    /// root CA certificate
+    fn root_cert_path(&self) -> Option<std::path::PathBuf> {
+        return self.to_owned().root_cert_path
+    }
+
+    /// client certificate
+    fn client_cert_path(&self) -> Option<std::path::PathBuf> {
+        return self.to_owned().client_cert_path
+    }
+
+    /// client private key
+    fn client_private_key(&self) -> Option<std::path::PathBuf> {
+        return self.to_owned().client_private_key
+    }
+
+    /// Path to NATS credentials (JWT/NKEY tokens)
+    fn creds_path(&self) -> Option<std::path::PathBuf> {
+        return self.to_owned().creds_path
+    }
+
+    /// Borealis Bus (NATS based MOM/MQ/SOA service bus) protocol://address:port
+    /// Example: "nats://borealis.aurora.dev:4222" or "tls://borealis.aurora.dev:4443" for TLS connection
+    //  default_value = "tls://eastcoast.nats.backend.aurora.dev:4222,tls://westcoast.nats.backend.aurora.dev:4222"
+    fn nats_server(&self) -> String {
+        return self.to_owned().nats_server
+    }
+
+    /// Stream messages to subject
+    //  default_value = "BlockIndex_StreamerMessages"
+    fn subject(&self) -> String {
+        return self.to_owned().subject
+    }
+
+    /// Streaming messages format (`CBOR` or `JSON`), suffix for subject name
+    //  default_value = "CBOR"
+    fn msg_format(&self) -> MsgFormat {
+        return self.msg_format
+    }
+
+    //  default_value = "FromInterruption"
+    fn sync_mode(&self) -> SyncMode {
+        return self.sync_mode
+    }
+
+    fn block_height(&self) -> Option<u64> {
+        return self.block_height
+    }
+
+    //  default_value = "StreamWhileSyncing"
+    fn await_synced(&self) -> AwaitSynced {
+        return self.await_synced
+    }
 }
 
+/// Producer's methods for Borealis NATS Bus
 #[async_trait]
-impl Producer for RunArgs {
+pub trait Producer
+where Self: Send + Sync + Sized + Clone + ToOwned {
+    /// root CA certificate
+    fn root_cert_path(&self) -> Option<std::path::PathBuf>;
+
+    /// client certificate
+    fn client_cert_path(&self) -> Option<std::path::PathBuf>;
+
+    /// client private key
+    fn client_private_key(&self) -> Option<std::path::PathBuf>;
+
+    /// Path to NATS credentials (JWT/NKEY tokens)
+    fn creds_path(&self) -> Option<std::path::PathBuf>;
+
+    /// Borealis Bus (NATS based MOM/MQ/SOA service bus) protocol://address:port
+    /// Example: "nats://borealis.aurora.dev:4222" or "tls://borealis.aurora.dev:4443" for TLS connection
+    //  default_value = "tls://eastcoast.nats.backend.aurora.dev:4222,tls://westcoast.nats.backend.aurora.dev:4222"
+    fn nats_server(&self) -> String;
+
+    /// Stream messages to subject
+    //  default_value = "BlockIndex_StreamerMessages"
+    fn subject(&self) -> String;
+
+    /// Streaming messages format (`CBOR` or `JSON`), suffix for subject name
+    //  default_value = "CBOR"
+    fn msg_format(&self) -> MsgFormat;
+
+    //  default_value = "FromInterruption"
+    fn sync_mode(&self) -> SyncMode;
+
+    fn block_height(&self) -> Option<u64>;
+
+    //  default_value = "StreamWhileSyncing"
+    fn await_synced(&self) -> AwaitSynced;
+
     /// Create connection to Borealis NATS Bus
-    fn nats_connect(self) -> nats::Connection {
+    fn nats_connect(&self) -> nats::Connection {
         let creds_path = self
-            .creds_path
+            .creds_path()
             .unwrap_or(std::path::PathBuf::from("./.nats/seed/nats.creds"));
 
         let options = match (
-            self.root_cert_path,
-            self.client_cert_path,
-            self.client_private_key,
+            self.root_cert_path(),
+            self.client_cert_path(),
+            self.client_private_key(),
         ) {
             (Some(root_cert_path), None, None) => {
                 nats::Options::with_credentials(creds_path)
@@ -380,7 +458,7 @@ impl Producer for RunArgs {
         };
 
         let nats_connection = options
-            .connect(self.nats_server.as_str())
+            .connect(self.nats_server().as_str())
             .expect("NATS connection error or wrong credentials");
 
         nats_connection
@@ -397,7 +475,7 @@ impl Producer for RunArgs {
 
     /// Create Borealis Message with payload
     fn message_encode<T: Serialize>(&self, msg_seq_id: u64, payload: &T) -> Vec<u8> {
-        match self.msg_format {
+        match self.msg_format() {
             MsgFormat::Cbor => {
                 BorealisMessage::new(
                     msg_seq_id,
@@ -416,13 +494,13 @@ impl Producer for RunArgs {
     /// Publish (transfer) message to Borealis NATS Bus
     fn message_publish<T: AsRef<[u8]>>(&self, nats_connection: &nats::Connection, message: &T) {
         nats_connection.publish(
-            format!("{}_{}", self.subject, self.msg_format.to_string()).as_str(),
+            format!("{}_{}", self.subject(), self.msg_format().to_string()).as_str(),
             message,
         )
-        .expect(format!("[Message as {} encoded bytes vector] Message passing error", self.msg_format.to_string()).as_str());
+        .expect(format!("[Message as {} encoded bytes vector] Message passing error", self.msg_format().to_string()).as_str());
     }
 
-    ///Run Borealis Indexer as Borealis NATS Bus Producer
+    /// Run Borealis Indexer as Borealis NATS Bus Producer
     fn run(&self, home_path: Option<std::path::PathBuf>) {
         // let home_dir = home_path.unwrap_or(std::path::PathBuf::from(near_indexer::get_default_home()));
         let home_dir = home_path
@@ -431,19 +509,19 @@ impl Producer for RunArgs {
         let indexer_config = near_indexer::IndexerConfig {
             home_dir,
             // recover and continue message streaming from latest synced block (real-time), or from interruption, or from exact block height
-            sync_mode: match self.sync_mode {
+            sync_mode: match self.sync_mode() {
                 SyncMode::LatestSynced => near_indexer::SyncModeEnum::LatestSynced,
                 SyncMode::FromInterruption => near_indexer::SyncModeEnum::FromInterruption,
-                SyncMode::BlockHeight => near_indexer::SyncModeEnum::BlockHeight(self.block_height.unwrap_or(0)),
+                SyncMode::BlockHeight => near_indexer::SyncModeEnum::BlockHeight(self.block_height().unwrap_or(0)),
             },
             // waiting for full sync or stream messages while syncing
-            await_for_node_synced: match self.await_synced {
+            await_for_node_synced: match self.await_synced() {
                 AwaitSynced::WaitForFullSync => near_indexer::AwaitForNodeSyncedEnum::WaitForFullSync,
                 AwaitSynced::StreamWhileSyncing => near_indexer::AwaitForNodeSyncedEnum::StreamWhileSyncing,
             },
         };
 
-        let nats_connection = self.to_owned().nats_connect();
+        let nats_connection = self.nats_connect();
 
         let system = actix::System::new();
         system.block_on(async move {
@@ -485,14 +563,22 @@ impl Producer for RunArgs {
     async fn handle_message(&self, streamer_message: near_indexer::StreamerMessage, nats_connection: &nats::Connection) -> anyhow::Result<()> {
         let message = self.message_encode(streamer_message.block.header.height, &streamer_message);
         self.message_publish(nats_connection, &message);
-        self.message_dump(Some(VerbosityLevel::WithBlockHashHeight), streamer_message);
+    //  self.message_dump(Some(VerbosityLevel::WithBlockHashHeight), streamer_message);
         Ok(())
     }
 
     /// Dump information from Indexer's state events/messages (`StreamerMessages`) about finalized blocks
     fn message_dump(&self, verbosity_level: Option<VerbosityLevel>, streamer_message: near_indexer::StreamerMessage) {
+
         // Data handling from `StreamerMessage` data structure. For custom filtering purposes.
         // Same as: jq '{block_height: .block.header.height, block_hash: .block.header.hash, block_header_chunk: .block.chunks[0], shard_chunk_header: .shards[0].chunk.header, transactions: .shards[0].chunk.transactions, receipts: .shards[0].chunk.receipts, receipt_execution_outcomes: .shards[0].receipt_execution_outcomes, state_changes: .state_changes}'
+
+        info!(
+            target: "borealis_indexer",
+            "block_height: #{}, block_hash: {}\n",
+            &streamer_message.block.header.height,
+            &streamer_message.block.header.hash
+        );
 
         if let Some(_verbosity_level) = verbosity_level {
             println!(
