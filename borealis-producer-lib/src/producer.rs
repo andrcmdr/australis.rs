@@ -1,5 +1,7 @@
 use actix;
+use anyhow::Result;
 use borealis_types::prelude::BorealisMessage;
+use futures::StreamExt;
 use nats;
 use near_indexer;
 use serde::Serialize;
@@ -7,8 +9,6 @@ use serde_cbor as cbor;
 use serde_json;
 use tokio::sync::mpsc;
 use tokio_stream;
-use futures::StreamExt;
-use anyhow::Result;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
@@ -33,18 +33,18 @@ pub struct Context {
     pub creds_path: Option<std::path::PathBuf>,
     /// Borealis Bus (NATS based MOM/MQ/SOA service bus) protocol://address:port
     /// Example: "nats://borealis.aurora.dev:4222" or "tls://borealis.aurora.dev:4443" for TLS connection
-//  default_value = "tls://eastcoast.nats.backend.aurora.dev:4222,tls://westcoast.nats.backend.aurora.dev:4222"
+    //  default_value = "tls://eastcoast.nats.backend.aurora.dev:4222,tls://westcoast.nats.backend.aurora.dev:4222"
     pub nats_server: String,
     /// Stream messages to subject
-//  default_value = "BlockIndex_StreamerMessages"
+    //  default_value = "BlockIndex_StreamerMessages"
     pub subject: String,
     /// Streaming messages format (`CBOR` or `JSON`), suffix for subject name
-//  default_value = "CBOR"
+    //  default_value = "CBOR"
     pub msg_format: MsgFormat,
-//  default_value = "FromInterruption"
+    //  default_value = "FromInterruption"
     pub sync_mode: SyncMode,
     pub block_height: Option<u64>,
-//  default_value = "StreamWhileSyncing"
+    //  default_value = "StreamWhileSyncing"
     pub await_synced: AwaitSynced,
 }
 
@@ -79,7 +79,11 @@ impl FromStr for MsgFormat {
         match input.as_str() {
             "cbor" => Ok(MsgFormat::Cbor),
             "json" => Ok(MsgFormat::Json),
-            _ => Err("Unknown message format: `--msg-fomat` should contain `CBOR` or `JSON`".to_string().into()),
+            _ => Err(
+                "Unknown message format: `--msg-fomat` should contain `CBOR` or `JSON`"
+                    .to_string()
+                    .into(),
+            ),
         }
     }
 }
@@ -172,7 +176,7 @@ pub struct InitConfigArgs {
     /// Specify private key generated from seed (TESTING ONLY)
     pub test_seed: Option<String>,
     /// Number of shards to initialize the chain with
-//  default_value = "1"
+    //  default_value = "1"
     pub num_shards: u64,
     /// Makes block production fast (TESTING ONLY)
     pub fast: bool,
@@ -252,73 +256,77 @@ impl Indexer for InitConfigArgs {
     /// Initialize Indexer's configurations
     fn init(&self, home_path: Option<std::path::PathBuf>) {
         // let home_dir = home_path.unwrap_or(std::path::PathBuf::from(near_indexer::get_default_home()));
-        let home_dir = home_path
-            .unwrap_or(std::path::PathBuf::from("./.borealis-indexer"));
+        let home_dir = home_path.unwrap_or(std::path::PathBuf::from("./.borealis-indexer"));
 
-        near_indexer::indexer_init_configs(&home_dir, self.to_owned().into()).expect("Error while creating Indexer's initial configuration files");
+        near_indexer::indexer_init_configs(&home_dir, self.to_owned().into())
+            .expect("Error while creating Indexer's initial configuration files");
     }
 }
 
 impl Producer for Context
-where Self: Send + Sync + Sized + Clone + ToOwned {
+where
+    Self: Send + Sync + Sized + Clone + ToOwned,
+{
     /// root CA certificate
     fn root_cert_path(&self) -> Option<std::path::PathBuf> {
-        return self.to_owned().root_cert_path
+        return self.to_owned().root_cert_path;
     }
 
     /// client certificate
     fn client_cert_path(&self) -> Option<std::path::PathBuf> {
-        return self.to_owned().client_cert_path
+        return self.to_owned().client_cert_path;
     }
 
     /// client private key
     fn client_private_key(&self) -> Option<std::path::PathBuf> {
-        return self.to_owned().client_private_key
+        return self.to_owned().client_private_key;
     }
 
     /// Path to NATS credentials (JWT/NKEY tokens)
     fn creds_path(&self) -> Option<std::path::PathBuf> {
-        return self.to_owned().creds_path
+        return self.to_owned().creds_path;
     }
 
     /// Borealis Bus (NATS based MOM/MQ/SOA service bus) protocol://address:port
     /// Example: "nats://borealis.aurora.dev:4222" or "tls://borealis.aurora.dev:4443" for TLS connection
     //  default_value = "tls://eastcoast.nats.backend.aurora.dev:4222,tls://westcoast.nats.backend.aurora.dev:4222"
     fn nats_server(&self) -> String {
-        return self.to_owned().nats_server
+        return self.to_owned().nats_server;
     }
 
     /// Stream messages to subject
     //  default_value = "BlockIndex_StreamerMessages"
     fn subject(&self) -> String {
-        return self.to_owned().subject
+        return self.to_owned().subject;
     }
 
     /// Streaming messages format (`CBOR` or `JSON`), suffix for subject name
     //  default_value = "CBOR"
     fn msg_format(&self) -> MsgFormat {
-        return self.msg_format
+        return self.msg_format;
     }
 
     //  default_value = "FromInterruption"
     fn sync_mode(&self) -> SyncMode {
-        return self.sync_mode
+        return self.sync_mode;
     }
 
     fn block_height(&self) -> Option<u64> {
-        return self.block_height
+        return self.block_height;
     }
 
     //  default_value = "StreamWhileSyncing"
     fn await_synced(&self) -> AwaitSynced {
-        return self.await_synced
+        return self.await_synced;
     }
 }
 
 /// Producer's methods for Borealis NATS Bus
 #[async_trait]
 pub trait Producer
-where Self: Send + Sync + Sized + Clone + ToOwned {
+where
+    Self: Send + Sync + Sized + Clone + ToOwned,
+{
     /// root CA certificate
     fn root_cert_path(&self) -> Option<std::path::PathBuf>;
 
@@ -370,7 +378,9 @@ where Self: Send + Sync + Sized + Clone + ToOwned {
                     .add_root_certificate(root_cert_path)
                     .reconnect_buffer_size(1024 * 1024 * 1024)
                     .max_reconnects(100000)
-                    .reconnect_callback(|| info!(target: "borealis_indexer", "connection has been reestablished"))
+                    .reconnect_callback(
+                        || info!(target: "borealis_indexer", "connection has been reestablished"),
+                    )
                     .reconnect_delay_callback(|reconnect_try| {
                         let reconnect_attempt = {
                             if reconnect_try == 0 {
@@ -380,7 +390,8 @@ where Self: Send + Sync + Sized + Clone + ToOwned {
                             }
                         };
                         let delay = core::time::Duration::from_millis(std::cmp::min(
-                            (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
+                            (reconnect_attempt
+                                * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
                                 as u64,
                             1000,
                         ));
@@ -391,8 +402,12 @@ where Self: Send + Sync + Sized + Clone + ToOwned {
                         );
                         delay
                     })
-                    .disconnect_callback(|| info!(target: "borealis_indexer", "connection has been lost")) // todo: re-run message producer
-                    .close_callback(|| info!(target: "borealis_indexer", "connection has been closed")) // todo: re-run message producer
+                    .disconnect_callback(
+                        || info!(target: "borealis_indexer", "connection has been lost"),
+                    ) // todo: re-run message producer
+                    .close_callback(
+                        || info!(target: "borealis_indexer", "connection has been closed"),
+                    ) // todo: re-run message producer
             }
             (Some(root_cert_path), Some(client_cert_path), Some(client_private_key)) => {
                 nats::Options::with_credentials(creds_path)
@@ -402,7 +417,9 @@ where Self: Send + Sync + Sized + Clone + ToOwned {
                     .client_cert(client_cert_path, client_private_key)
                     .reconnect_buffer_size(1024 * 1024 * 1024)
                     .max_reconnects(100000)
-                    .reconnect_callback(|| info!(target: "borealis_indexer", "connection has been reestablished"))
+                    .reconnect_callback(
+                        || info!(target: "borealis_indexer", "connection has been reestablished"),
+                    )
                     .reconnect_delay_callback(|reconnect_try| {
                         let reconnect_attempt = {
                             if reconnect_try == 0 {
@@ -412,7 +429,8 @@ where Self: Send + Sync + Sized + Clone + ToOwned {
                             }
                         };
                         let delay = core::time::Duration::from_millis(std::cmp::min(
-                            (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
+                            (reconnect_attempt
+                                * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
                                 as u64,
                             1000,
                         ));
@@ -423,15 +441,21 @@ where Self: Send + Sync + Sized + Clone + ToOwned {
                         );
                         delay
                     })
-                    .disconnect_callback(|| info!(target: "borealis_indexer", "connection has been lost")) // todo: re-run message producer
-                    .close_callback(|| info!(target: "borealis_indexer", "connection has been closed")) // todo: re-run message producer
+                    .disconnect_callback(
+                        || info!(target: "borealis_indexer", "connection has been lost"),
+                    ) // todo: re-run message producer
+                    .close_callback(
+                        || info!(target: "borealis_indexer", "connection has been closed"),
+                    ) // todo: re-run message producer
             }
             _ => {
                 nats::Options::with_credentials(creds_path)
                     .with_name("Borealis Indexer [NATS, without TLS]")
                     .reconnect_buffer_size(1024 * 1024 * 1024)
                     .max_reconnects(100000)
-                    .reconnect_callback(|| info!(target: "borealis_indexer", "connection has been reestablished"))
+                    .reconnect_callback(
+                        || info!(target: "borealis_indexer", "connection has been reestablished"),
+                    )
                     .reconnect_delay_callback(|reconnect_try| {
                         let reconnect_attempt = {
                             if reconnect_try == 0 {
@@ -441,7 +465,8 @@ where Self: Send + Sync + Sized + Clone + ToOwned {
                             }
                         };
                         let delay = core::time::Duration::from_millis(std::cmp::min(
-                            (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
+                            (reconnect_attempt
+                                * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
                                 as u64,
                             1000,
                         ));
@@ -452,8 +477,12 @@ where Self: Send + Sync + Sized + Clone + ToOwned {
                         );
                         delay
                     })
-                    .disconnect_callback(|| info!(target: "borealis_indexer", "connection has been lost")) // todo: re-run message producer
-                    .close_callback(|| info!(target: "borealis_indexer", "connection has been closed")) // todo: re-run message producer
+                    .disconnect_callback(
+                        || info!(target: "borealis_indexer", "connection has been lost"),
+                    ) // todo: re-run message producer
+                    .close_callback(
+                        || info!(target: "borealis_indexer", "connection has been closed"),
+                    ) // todo: re-run message producer
             }
         };
 
@@ -466,7 +495,7 @@ where Self: Send + Sync + Sized + Clone + ToOwned {
 
     /// Check connection to Borealis NATS Bus
     fn nats_check_connection(&self, nats_connection: &nats::Connection) {
-    //  info!(target: "borealis_indexer", "NATS Connection: {:?}", nats_connection);
+        //  info!(target: "borealis_indexer", "NATS Connection: {:?}", nats_connection);
         info!(target: "borealis_indexer", "round trip time (rtt) between this client and the current NATS server: {:?}", nats_connection.rtt());
         info!(target: "borealis_indexer", "this client IP address, as known by the current NATS server: {:?}", nats_connection.client_ip());
         info!(target: "borealis_indexer", "this client ID, as known by the current NATS server: {:?}", nats_connection.client_id());
@@ -476,35 +505,31 @@ where Self: Send + Sync + Sized + Clone + ToOwned {
     /// Create Borealis Message with payload
     fn message_encode<T: Serialize>(&self, msg_seq_id: u64, payload: &T) -> Vec<u8> {
         match self.msg_format() {
-            MsgFormat::Cbor => {
-                BorealisMessage::new(
-                    msg_seq_id,
-                    payload,
-                ).to_cbor()
-            }
-            MsgFormat::Json => {
-                BorealisMessage::new(
-                    msg_seq_id,
-                    payload,
-                ).to_json_bytes()
-            }
+            MsgFormat::Cbor => BorealisMessage::new(msg_seq_id, payload).to_cbor(),
+            MsgFormat::Json => BorealisMessage::new(msg_seq_id, payload).to_json_bytes(),
         }
     }
 
     /// Publish (transfer) message to Borealis NATS Bus
     fn message_publish<T: AsRef<[u8]>>(&self, nats_connection: &nats::Connection, message: &T) {
-        nats_connection.publish(
-            format!("{}_{}", self.subject(), self.msg_format().to_string()).as_str(),
-            message,
-        )
-        .expect(format!("[Message as {} encoded bytes vector] Message passing error", self.msg_format().to_string()).as_str());
+        nats_connection
+            .publish(
+                format!("{}_{}", self.subject(), self.msg_format().to_string()).as_str(),
+                message,
+            )
+            .expect(
+                format!(
+                    "[Message as {} encoded bytes vector] Message passing error",
+                    self.msg_format().to_string()
+                )
+                .as_str(),
+            );
     }
 
     /// Run Borealis Indexer as Borealis NATS Bus Producer
     fn run(&self, home_path: Option<std::path::PathBuf>) {
         // let home_dir = home_path.unwrap_or(std::path::PathBuf::from(near_indexer::get_default_home()));
-        let home_dir = home_path
-            .unwrap_or(std::path::PathBuf::from("./.borealis-indexer"));
+        let home_dir = home_path.unwrap_or(std::path::PathBuf::from("./.borealis-indexer"));
 
         let indexer_config = near_indexer::IndexerConfig {
             home_dir,
@@ -512,12 +537,18 @@ where Self: Send + Sync + Sized + Clone + ToOwned {
             sync_mode: match self.sync_mode() {
                 SyncMode::LatestSynced => near_indexer::SyncModeEnum::LatestSynced,
                 SyncMode::FromInterruption => near_indexer::SyncModeEnum::FromInterruption,
-                SyncMode::BlockHeight => near_indexer::SyncModeEnum::BlockHeight(self.block_height().unwrap_or(0)),
+                SyncMode::BlockHeight => {
+                    near_indexer::SyncModeEnum::BlockHeight(self.block_height().unwrap_or(0))
+                }
             },
             // waiting for full sync or stream messages while syncing
             await_for_node_synced: match self.await_synced() {
-                AwaitSynced::WaitForFullSync => near_indexer::AwaitForNodeSyncedEnum::WaitForFullSync,
-                AwaitSynced::StreamWhileSyncing => near_indexer::AwaitForNodeSyncedEnum::StreamWhileSyncing,
+                AwaitSynced::WaitForFullSync => {
+                    near_indexer::AwaitForNodeSyncedEnum::WaitForFullSync
+                }
+                AwaitSynced::StreamWhileSyncing => {
+                    near_indexer::AwaitForNodeSyncedEnum::StreamWhileSyncing
+                }
             },
         };
 
@@ -525,7 +556,8 @@ where Self: Send + Sync + Sized + Clone + ToOwned {
 
         let system = actix::System::new();
         system.block_on(async move {
-            let indexer = near_indexer::Indexer::new(indexer_config).expect("Error while creating Indexer instance");
+            let indexer = near_indexer::Indexer::new(indexer_config)
+                .expect("Error while creating Indexer instance");
             let events_stream = indexer.streamer();
             self.listen_events(events_stream, &nats_connection).await;
             actix::System::current().stop();
@@ -534,24 +566,32 @@ where Self: Send + Sync + Sized + Clone + ToOwned {
     }
 
     /// Listen Indexer's state events and receive `StreamerMessages` with information about finalized blocks
-    async fn listen_events(&self, events_stream: mpsc::Receiver<near_indexer::StreamerMessage>, nats_connection: &nats::Connection) {
+    async fn listen_events(
+        &self,
+        events_stream: mpsc::Receiver<near_indexer::StreamerMessage>,
+        nats_connection: &nats::Connection,
+    ) {
         info!(
             target: "borealis_indexer",
             "Message producer loop started: listening for new messages\n"
         );
-        let mut handle_messages = tokio_stream::wrappers::ReceiverStream::new(events_stream).map(|streamer_message| async {
-            info!(
-                target: "borealis_indexer",
-                "Message producer loop executed: message received\n"
-            );
-            info!(
-                target: "borealis_indexer",
-                "block_height: #{}, block_hash: {}\n",
-                &streamer_message.block.header.height,
-                &streamer_message.block.header.hash
-            );
-            self.handle_message(streamer_message, nats_connection).await.map_err(|e| println!("Error: {}", e))
-        });
+        let mut handle_messages = tokio_stream::wrappers::ReceiverStream::new(events_stream).map(
+            |streamer_message| async {
+                info!(
+                    target: "borealis_indexer",
+                    "Message producer loop executed: message received\n"
+                );
+                info!(
+                    target: "borealis_indexer",
+                    "block_height: #{}, block_hash: {}\n",
+                    &streamer_message.block.header.height,
+                    &streamer_message.block.header.hash
+                );
+                self.handle_message(streamer_message, nats_connection)
+                    .await
+                    .map_err(|e| println!("Error: {}", e))
+            },
+        );
         while let Some(_handled_message) = handle_messages.next().await {}
         // Graceful shutdown
         info!(target: "borealis_indexer", "Indexer will be shutted down gracefully in 10 seconds...");
@@ -560,16 +600,23 @@ where Self: Send + Sync + Sized + Clone + ToOwned {
     }
 
     /// Handle Indexer's state events/messages (`StreamerMessages`) about finalized blocks
-    async fn handle_message(&self, streamer_message: near_indexer::StreamerMessage, nats_connection: &nats::Connection) -> anyhow::Result<()> {
+    async fn handle_message(
+        &self,
+        streamer_message: near_indexer::StreamerMessage,
+        nats_connection: &nats::Connection,
+    ) -> anyhow::Result<()> {
         let message = self.message_encode(streamer_message.block.header.height, &streamer_message);
         self.message_publish(nats_connection, &message);
-    //  self.message_dump(Some(VerbosityLevel::WithBlockHashHeight), streamer_message);
+        //  self.message_dump(Some(VerbosityLevel::WithBlockHashHeight), streamer_message);
         Ok(())
     }
 
     /// Dump information from Indexer's state events/messages (`StreamerMessages`) about finalized blocks
-    fn message_dump(&self, verbosity_level: Option<VerbosityLevel>, streamer_message: near_indexer::StreamerMessage) {
-
+    fn message_dump(
+        &self,
+        verbosity_level: Option<VerbosityLevel>,
+        streamer_message: near_indexer::StreamerMessage,
+    ) {
         // Data handling from `StreamerMessage` data structure. For custom filtering purposes.
         // Same as: jq '{block_height: .block.header.height, block_hash: .block.header.hash, block_header_chunk: .block.chunks[0], shard_chunk_header: .shards[0].chunk.header, transactions: .shards[0].chunk.transactions, receipts: .shards[0].chunk.receipts, receipt_execution_outcomes: .shards[0].receipt_execution_outcomes, state_changes: .state_changes}'
 
@@ -587,7 +634,9 @@ where Self: Send + Sync + Sized + Clone + ToOwned {
             );
         };
 
-        if let Some(VerbosityLevel::WithStreamerMessageDump) | Some(VerbosityLevel::WithStreamerMessageParse) = verbosity_level {
+        if let Some(VerbosityLevel::WithStreamerMessageDump)
+        | Some(VerbosityLevel::WithStreamerMessageParse) = verbosity_level
+        {
             println!(
                 "streamer_message: {}\n",
                 serde_json::to_string_pretty(&streamer_message).unwrap()
@@ -698,4 +747,3 @@ where Self: Send + Sync + Sized + Clone + ToOwned {
         };
     }
 }
-

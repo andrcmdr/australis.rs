@@ -1,16 +1,17 @@
 use actix;
-use nats;
-use nats::jetstream::{
-    AckPolicy, Consumer as JetStreamConsumer, ConsumerConfig, DeliverPolicy, DiscardPolicy, ReplayPolicy,
-    RetentionPolicy, StorageType, StreamConfig, StreamInfo, DateTime, ConsumerInfo, AccountInfo
-};
 use chrono::{DateTime as ChronoDateTime, Utc};
 // use chrono::TimeZone;
+use nats;
+use nats::jetstream::{
+    AccountInfo, AckPolicy, Consumer as JetStreamConsumer, ConsumerConfig, ConsumerInfo, DateTime,
+    DeliverPolicy, DiscardPolicy, ReplayPolicy, RetentionPolicy, StorageType, StreamConfig,
+    StreamInfo,
+};
 // use near_indexer::StreamerMessage;
 use borealis_types::prelude::{BorealisMessage, StreamerMessage};
+use serde::de::DeserializeOwned;
 use serde_cbor as cbor;
 use serde_json;
-use serde::de::DeserializeOwned;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
@@ -31,7 +32,7 @@ pub struct Context {
     pub creds_path: Option<std::path::PathBuf>,
     /// Borealis Bus (NATS based MOM/MQ/SOA service bus) protocol://address:port
     /// Example: "nats://borealis.aurora.dev:4222" or "tls://borealis.aurora.dev:4443" for TLS connection
-    ///  default_value = "tls://westcoast.nats.backend.aurora.dev:4222,tls://eastcoast.nats.backend.aurora.dev:4222"
+    ///  default_value = "tls://eastcoast.nats.backend.aurora.dev:4222,tls://westcoast.nats.backend.aurora.dev:4222"
     pub nats_server: String,
     /// Consumer work mode (standard `Subscriber` or `JetStream` subscriber)
     ///  default_value = "JetStream"
@@ -73,7 +74,11 @@ impl FromStr for WorkMode {
         match input.as_str() {
             "subscriber" => Ok(WorkMode::Subscriber),
             "jetstream" => Ok(WorkMode::Jetstream),
-            _ => Err("Unknown consumer work mode: `--work-mode` should be `Subscriber` or `JetStream`".to_string().into()),
+            _ => Err(
+                "Unknown consumer work mode: `--work-mode` should be `Subscriber` or `JetStream`"
+                    .to_string()
+                    .into(),
+            ),
         }
     }
 }
@@ -92,7 +97,11 @@ impl FromStr for MsgFormat {
         match input.as_str() {
             "cbor" => Ok(MsgFormat::Cbor),
             "json" => Ok(MsgFormat::Json),
-            _ => Err("Unknown message format: `--msg-fomat` should contain `CBOR` or `JSON`".to_string().into()),
+            _ => Err(
+                "Unknown message format: `--msg-fomat` should contain `CBOR` or `JSON`"
+                    .to_string()
+                    .into(),
+            ),
         }
     }
 }
@@ -170,7 +179,9 @@ pub fn nats_connect(context: Context) -> nats::Connection {
                 .add_root_certificate(root_cert_path)
                 .reconnect_buffer_size(1024 * 1024 * 1024)
                 .max_reconnects(100000)
-                .reconnect_callback(|| info!(target: "borealis_consumer", "connection has been reestablished"))
+                .reconnect_callback(
+                    || info!(target: "borealis_consumer", "connection has been reestablished"),
+                )
                 .reconnect_delay_callback(|reconnect_try| {
                     let reconnect_attempt = {
                         if reconnect_try == 0 {
@@ -180,7 +191,8 @@ pub fn nats_connect(context: Context) -> nats::Connection {
                         }
                     };
                     let delay = core::time::Duration::from_millis(std::cmp::min(
-                        (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
+                        (reconnect_attempt
+                            * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
                             as u64,
                         1000,
                     ));
@@ -191,8 +203,11 @@ pub fn nats_connect(context: Context) -> nats::Connection {
                     );
                     delay
                 })
-                .disconnect_callback(|| info!(target: "borealis_consumer", "connection has been lost")) // todo: re-run message consumer
-                .close_callback(|| info!(target: "borealis_consumer", "connection has been closed")) // todo: re-run message consumer
+                .disconnect_callback(
+                    || info!(target: "borealis_consumer", "connection has been lost"),
+                ) // todo: re-run message consumer
+                .close_callback(|| info!(target: "borealis_consumer", "connection has been closed"))
+            // todo: re-run message consumer
         }
         (Some(root_cert_path), Some(client_cert_path), Some(client_private_key)) => {
             nats::Options::with_credentials(creds_path)
@@ -202,7 +217,9 @@ pub fn nats_connect(context: Context) -> nats::Connection {
                 .client_cert(client_cert_path, client_private_key)
                 .reconnect_buffer_size(1024 * 1024 * 1024)
                 .max_reconnects(100000)
-                .reconnect_callback(|| info!(target: "borealis_consumer", "connection has been reestablished"))
+                .reconnect_callback(
+                    || info!(target: "borealis_consumer", "connection has been reestablished"),
+                )
                 .reconnect_delay_callback(|reconnect_try| {
                     let reconnect_attempt = {
                         if reconnect_try == 0 {
@@ -212,7 +229,8 @@ pub fn nats_connect(context: Context) -> nats::Connection {
                         }
                     };
                     let delay = core::time::Duration::from_millis(std::cmp::min(
-                        (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
+                        (reconnect_attempt
+                            * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
                             as u64,
                         1000,
                     ));
@@ -223,15 +241,20 @@ pub fn nats_connect(context: Context) -> nats::Connection {
                     );
                     delay
                 })
-                .disconnect_callback(|| info!(target: "borealis_consumer", "connection has been lost")) // todo: re-run message consumer
-                .close_callback(|| info!(target: "borealis_consumer", "connection has been closed")) // todo: re-run message consumer
+                .disconnect_callback(
+                    || info!(target: "borealis_consumer", "connection has been lost"),
+                ) // todo: re-run message consumer
+                .close_callback(|| info!(target: "borealis_consumer", "connection has been closed"))
+            // todo: re-run message consumer
         }
         _ => {
             nats::Options::with_credentials(creds_path)
                 .with_name("Borealis Indexer [NATS, without TLS]")
                 .reconnect_buffer_size(1024 * 1024 * 1024)
                 .max_reconnects(100000)
-                .reconnect_callback(|| info!(target: "borealis_consumer", "connection has been reestablished"))
+                .reconnect_callback(
+                    || info!(target: "borealis_consumer", "connection has been reestablished"),
+                )
                 .reconnect_delay_callback(|reconnect_try| {
                     let reconnect_attempt = {
                         if reconnect_try == 0 {
@@ -241,7 +264,8 @@ pub fn nats_connect(context: Context) -> nats::Connection {
                         }
                     };
                     let delay = core::time::Duration::from_millis(std::cmp::min(
-                        (reconnect_attempt * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
+                        (reconnect_attempt
+                            * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
                             as u64,
                         1000,
                     ));
@@ -252,8 +276,11 @@ pub fn nats_connect(context: Context) -> nats::Connection {
                     );
                     delay
                 })
-                .disconnect_callback(|| info!(target: "borealis_consumer", "connection has been lost")) // todo: re-run message consumer
-                .close_callback(|| info!(target: "borealis_consumer", "connection has been closed")) // todo: re-run message consumer
+                .disconnect_callback(
+                    || info!(target: "borealis_consumer", "connection has been lost"),
+                ) // todo: re-run message consumer
+                .close_callback(|| info!(target: "borealis_consumer", "connection has been closed"))
+            // todo: re-run message consumer
         }
     };
 
@@ -266,7 +293,7 @@ pub fn nats_connect(context: Context) -> nats::Connection {
 
 /// Check connection to Borealis NATS Bus
 pub fn nats_check_connection(nats_connection: &nats::Connection) {
-//  info!(target: "borealis_consumer", "NATS Connection: {:?}", nats_connection);
+    //  info!(target: "borealis_consumer", "NATS Connection: {:?}", nats_connection);
     info!(target: "borealis_consumer", "round trip time (rtt) between this client and the current NATS server: {:?}", nats_connection.rtt());
     info!(target: "borealis_consumer", "this client IP address, as known by the current NATS server: {:?}", nats_connection.client_ip());
     info!(target: "borealis_consumer", "this client ID, as known by the current NATS server: {:?}", nats_connection.client_id());
@@ -276,8 +303,16 @@ pub fn nats_check_connection(nats_connection: &nats::Connection) {
 /// Initialization for JetStream consumers
 pub fn init(context: &Context) {
     let nats_connection = nats_connect(context.to_owned());
-    let stream_info = jetstream_create_stream(&nats_connection, format!("{}_{}", context.subject, context.msg_format.to_string()), Some(vec![format!("{}_{}", context.subject, context.msg_format.to_string())]));
-    let consumer = jetstream_create_consumer_from_args(context, &nats_connection);
+    let stream_info = jetstream_create_stream(
+        &nats_connection,
+        format!("{}_{}", context.subject, context.msg_format.to_string()),
+        Some(vec![format!(
+            "{}_{}",
+            context.subject,
+            context.msg_format.to_string()
+        )]),
+    );
+    let consumer = jetstream_create_consumer_from_context(context, &nats_connection);
 
     info!(
         target: "borealis_consumer",
@@ -292,7 +327,11 @@ pub fn init(context: &Context) {
 }
 
 /// Create JetStream with initial stream name and consisting of exact subject names
-pub fn jetstream_create_stream(nats_connection: &nats::Connection, stream_name: String, subject_names: Option<Vec<String>>) -> StreamInfo {
+pub fn jetstream_create_stream(
+    nats_connection: &nats::Connection,
+    stream_name: String,
+    subject_names: Option<Vec<String>>,
+) -> StreamInfo {
     // JetStreams cannot be created from NATS Client side due to restrictions on NATS server side, but this ability is still available in library for client side consumers
     let stream_info = nats_connection.create_stream(StreamConfig {
         name: stream_name,
@@ -315,7 +354,13 @@ pub fn jetstream_create_stream(nats_connection: &nats::Connection, stream_name: 
 
 /// Create JetStream consumer with custom parameters
 /// (see NATS documentation descrption for the meaning of particular ConsumerConfig parameters)
-pub fn jetstream_create_consumer(nats_connection: &nats::Connection, stream_name: String, deliver_subject: Option<String>, durable_name: Option<String>, filter_subject: String) -> JetStreamConsumer {
+pub fn jetstream_create_consumer(
+    nats_connection: &nats::Connection,
+    stream_name: String,
+    deliver_subject: Option<String>,
+    durable_name: Option<String>,
+    filter_subject: String,
+) -> JetStreamConsumer {
     let consumer = JetStreamConsumer::create_or_open(nats_connection.to_owned(), stream_name.as_str(), ConsumerConfig {
         deliver_subject,
         durable_name,
@@ -340,7 +385,14 @@ pub fn jetstream_create_consumer(nats_connection: &nats::Connection, stream_name
 }
 
 /// Create JetStream consumer to consume messages after message with exact sequential number
-pub fn jetstream_create_consumer_from_start_seq(nats_connection: &nats::Connection, stream_name: String, deliver_subject: Option<String>, durable_name: Option<String>, filter_subject: String, start_seq: Option<i64>) -> JetStreamConsumer {
+pub fn jetstream_create_consumer_from_start_seq(
+    nats_connection: &nats::Connection,
+    stream_name: String,
+    deliver_subject: Option<String>,
+    durable_name: Option<String>,
+    filter_subject: String,
+    start_seq: Option<i64>,
+) -> JetStreamConsumer {
     let consumer = JetStreamConsumer::create_or_open(nats_connection.to_owned(), stream_name.as_str(), ConsumerConfig {
         deliver_subject,
         durable_name,
@@ -369,7 +421,14 @@ pub fn jetstream_create_consumer_from_start_seq(nats_connection: &nats::Connecti
 }
 
 /// Create JetStream consumer to consume messages after message with exact timestamp
-pub fn jetstream_create_consumer_from_start_time(nats_connection: &nats::Connection, stream_name: String, deliver_subject: Option<String>, durable_name: Option<String>, filter_subject: String, start_time: Option<ChronoDateTime<Utc>>) -> JetStreamConsumer {
+pub fn jetstream_create_consumer_from_start_time(
+    nats_connection: &nats::Connection,
+    stream_name: String,
+    deliver_subject: Option<String>,
+    durable_name: Option<String>,
+    filter_subject: String,
+    start_time: Option<ChronoDateTime<Utc>>,
+) -> JetStreamConsumer {
     let consumer = JetStreamConsumer::create_or_open(nats_connection.to_owned(), stream_name.as_str(), ConsumerConfig {
         deliver_subject,
         durable_name,
@@ -399,7 +458,10 @@ pub fn jetstream_create_consumer_from_start_time(nats_connection: &nats::Connect
 
 /// Create JetStream consumer from Context parameters
 /// (see documentation descrption for the meaning of particular Context and ConsumerConfig parameters)
-pub fn jetstream_create_consumer_from_args(context: &Context, nats_connection: &nats::Connection) -> JetStreamConsumer {
+pub fn jetstream_create_consumer_from_context(
+    context: &Context,
+    nats_connection: &nats::Connection,
+) -> JetStreamConsumer {
     let consumer = JetStreamConsumer::create_or_open(nats_connection.to_owned(), format!("{}_{}", context.subject, context.msg_format.to_string()).as_str(), ConsumerConfig {
         deliver_subject: Some(format!("{}_{}", context.subject, context.msg_format.to_string())),
         durable_name: Some(format!("Borealis_Consumer_{}_{}", context.subject, context.msg_format.to_string())),
@@ -425,50 +487,53 @@ pub fn jetstream_create_consumer_from_args(context: &Context, nats_connection: &
 
 /// Get names for all JetStream streams from NATS server
 pub fn get_stream_names(nats_connection: &nats::Connection) {
-    nats_connection.stream_names().for_each(| stream_name | {
-        match stream_name {
+    nats_connection
+        .stream_names()
+        .for_each(|stream_name| match stream_name {
             Ok(stream_name) => {
                 info!(
                     target: "borealis_consumer",
                     "Stream name: {}",
                     stream_name
                 );
-            },
+            }
             Err(error) => {
                 info!(
                     target: "borealis_consumer",
                     "Error during retrieving a stream name: {}",
                     error
                 );
-            },
-        }
-    });
+            }
+        });
 }
 
 /// Get full information about all JetStream streams from NATS server
 pub fn get_streams_list(nats_connection: &nats::Connection) {
-    nats_connection.list_streams().for_each(| stream_info | {
-        match stream_info {
+    nats_connection
+        .list_streams()
+        .for_each(|stream_info| match stream_info {
             Ok(stream_info) => {
                 info!(
                     target: "borealis_consumer",
                     "Stream information: {:?}",
                     stream_info
                 );
-            },
+            }
             Err(error) => {
                 info!(
                     target: "borealis_consumer",
                     "Error during retrieving a stream information: {}",
                     error
                 );
-            },
-        }
-    });
+            }
+        });
 }
 
 /// Get full information about particular JetStream stream from NATS server
-pub fn get_stream_info(nats_connection: &nats::Connection, stream_name: String) -> std::io::Result<StreamInfo> {
+pub fn get_stream_info(
+    nats_connection: &nats::Connection,
+    stream_name: String,
+) -> std::io::Result<StreamInfo> {
     match nats_connection.stream_info(stream_name.as_str()) {
         Ok(stream_info) => {
             info!(
@@ -478,7 +543,7 @@ pub fn get_stream_info(nats_connection: &nats::Connection, stream_name: String) 
                 stream_info
             );
             Ok(stream_info)
-        },
+        }
         Err(error) => {
             info!(
                 target: "borealis_consumer",
@@ -487,7 +552,7 @@ pub fn get_stream_info(nats_connection: &nats::Connection, stream_name: String) 
                 error
             );
             Err(error)
-        },
+        }
     }
 }
 
@@ -495,7 +560,7 @@ pub fn get_stream_info(nats_connection: &nats::Connection, stream_name: String) 
 pub fn get_consumers_list(nats_connection: &nats::Connection, stream_name: String) {
     match nats_connection.list_consumers(stream_name.as_str()) {
         Ok(consumers_list) => {
-            consumers_list.for_each(| consumer_info | {
+            consumers_list.for_each(|consumer_info| {
                 if let Ok(consumer_info) = consumer_info {
                     info!(
                         target: "borealis_consumer",
@@ -512,7 +577,7 @@ pub fn get_consumers_list(nats_connection: &nats::Connection, stream_name: Strin
                     );
                 };
             });
-        },
+        }
         Err(error) => {
             info!(
                 target: "borealis_consumer",
@@ -520,12 +585,16 @@ pub fn get_consumers_list(nats_connection: &nats::Connection, stream_name: Strin
                 stream_name,
                 error
             );
-        },
+        }
     }
 }
 
 /// Get full information about certain JetStream consumer created for particular stream from NATS server
-pub fn get_consumer_info(nats_connection: &nats::Connection, stream_name: String, consumer_name: String) -> std::io::Result<ConsumerInfo> {
+pub fn get_consumer_info(
+    nats_connection: &nats::Connection,
+    stream_name: String,
+    consumer_name: String,
+) -> std::io::Result<ConsumerInfo> {
     match nats_connection.consumer_info(stream_name.as_str(), consumer_name.as_str()) {
         Ok(consumer_info) => {
             info!(
@@ -536,7 +605,7 @@ pub fn get_consumer_info(nats_connection: &nats::Connection, stream_name: String
                 consumer_info
             );
             Ok(consumer_info)
-        },
+        }
         Err(error) => {
             info!(
                 target: "borealis_consumer",
@@ -546,12 +615,14 @@ pub fn get_consumer_info(nats_connection: &nats::Connection, stream_name: String
                 error
             );
             Err(error)
-        },
+        }
     }
 }
 
 /// Get full information about JetStream client account from NATS server
-pub fn get_jetstream_account_info(nats_connection: &nats::Connection) -> std::io::Result<AccountInfo> {
+pub fn get_jetstream_account_info(
+    nats_connection: &nats::Connection,
+) -> std::io::Result<AccountInfo> {
     match nats_connection.account_info() {
         Ok(account_info) => {
             info!(
@@ -560,7 +631,7 @@ pub fn get_jetstream_account_info(nats_connection: &nats::Connection) -> std::io
                 account_info
             );
             Ok(account_info)
-        },
+        }
         Err(error) => {
             info!(
                 target: "borealis_consumer",
@@ -568,32 +639,30 @@ pub fn get_jetstream_account_info(nats_connection: &nats::Connection) -> std::io
                 error
             );
             Err(error)
-        },
+        }
     }
 }
 
 /// Create subscription to NATS subject
-pub fn create_subscription(nats_connection: &nats::Connection, subject_name: String) -> nats::Subscription {
+pub fn create_subscription(
+    nats_connection: &nats::Connection,
+    subject_name: String,
+) -> nats::Subscription {
     let subscription = nats_connection
-    .subscribe(
-        subject_name.as_str(),
-    )
-    .expect(
-        "Subscription error: maybe wrong or nonexistent `--subject` name",
-    );
+        .subscribe(subject_name.as_str())
+        .expect("Subscription error: maybe wrong or nonexistent `--subject` name");
     subscription
 }
 
 /// Create subscription to NATS subject from Context parameters
 /// (see documentation descrption for the meaning of particular Context parameters)
-pub fn create_subscription_from_args(context: &Context, nats_connection: &nats::Connection) -> nats::Subscription {
+pub fn create_subscription_from_context(
+    context: &Context,
+    nats_connection: &nats::Connection,
+) -> nats::Subscription {
     let subscription = nats_connection
-    .subscribe(
-        format!("{}_{}", context.subject, context.msg_format.to_string()).as_str(),
-    )
-    .expect(
-        "Subscription error: maybe wrong or nonexistent `--subject` name",
-    );
+        .subscribe(format!("{}_{}", context.subject, context.msg_format.to_string()).as_str())
+        .expect("Subscription error: maybe wrong or nonexistent `--subject` name");
     subscription
 }
 
@@ -611,13 +680,14 @@ pub fn run(context: &Context) {
 pub fn listen_messages(context: &Context, nats_connection: &nats::Connection) {
     match context.work_mode {
         WorkMode::Subscriber => {
-            let subscription = create_subscription_from_args(context, &nats_connection);
+            let subscription = create_subscription_from_context(context, &nats_connection);
             loop {
                 info!(
                     target: "borealis_consumer",
                     "Message consumer loop started: listening for new messages\n"
                 );
-                if let Ok(msg) = subscription.next_timeout(std::time::Duration::from_millis(10000)) {
+                if let Ok(msg) = subscription.next_timeout(std::time::Duration::from_millis(10000))
+                {
                     info!(target: "borealis_consumer", "Received message:\n{}", &msg);
                     handle_message(context, msg);
                 } else {
@@ -626,10 +696,10 @@ pub fn listen_messages(context: &Context, nats_connection: &nats::Connection) {
                         "Message wasn't received within 10s timeframe: Error occured due to waiting timeout for message receiving was elapsed\n"
                     );
                 };
-            };
-        },
+            }
+        }
         WorkMode::Jetstream => {
-            let mut consumer = jetstream_create_consumer_from_args(context, &nats_connection);
+            let mut consumer = jetstream_create_consumer_from_context(context, &nats_connection);
             consumer.timeout = std::time::Duration::from_millis(10000);
             loop {
                 info!(
@@ -647,8 +717,8 @@ pub fn listen_messages(context: &Context, nats_connection: &nats::Connection) {
                         "Message wasn't received within 10s timeframe: Error occured due to waiting timeout for message receiving was elapsed\n"
                     );
                 };
-            };
-        },
+            }
+        }
     }
 }
 
@@ -688,7 +758,10 @@ pub fn message_get_payload<T: DeserializeOwned>(context: &Context, msg: nats::Me
 }
 
 /// Decode received NATS message from CBOR (of JSON)
-pub fn message_decode<T: DeserializeOwned>(context: &Context, msg: nats::Message) -> BorealisMessage<T> {
+pub fn message_decode<T: DeserializeOwned>(
+    context: &Context,
+    msg: nats::Message,
+) -> BorealisMessage<T> {
     // Decoding of Borealis Message receved from NATS subject/jetstream
     let borealis_message: BorealisMessage<T> = match context.msg_format {
         MsgFormat::Cbor => BorealisMessage::from_cbor(msg.data.as_ref())
@@ -701,7 +774,6 @@ pub fn message_decode<T: DeserializeOwned>(context: &Context, msg: nats::Message
 
 /// Dump information from `StreamerMessage` payload, extracted from received NATS message
 pub fn message_dump(verbosity_level: Option<VerbosityLevel>, streamer_message: StreamerMessage) {
-
     // Data handling from `StreamerMessage` data structure. For custom filtering purposes.
     // Same as: jq '{block_height: .block.header.height, block_hash: .block.header.hash, block_header_chunk: .block.chunks[0], shard_chunk_header: .shards[0].chunk.header, transactions: .shards[0].chunk.transactions, receipts: .shards[0].chunk.receipts, receipt_execution_outcomes: .shards[0].receipt_execution_outcomes, state_changes: .state_changes}'
 
@@ -719,7 +791,9 @@ pub fn message_dump(verbosity_level: Option<VerbosityLevel>, streamer_message: S
         );
     };
 
-    if let Some(VerbosityLevel::WithStreamerMessageDump) | Some(VerbosityLevel::WithStreamerMessageParse) = verbosity_level {
+    if let Some(VerbosityLevel::WithStreamerMessageDump)
+    | Some(VerbosityLevel::WithStreamerMessageParse) = verbosity_level
+    {
         println!(
             "streamer_message: {}\n",
             serde_json::to_string_pretty(&streamer_message).unwrap()
@@ -829,4 +903,3 @@ pub fn message_dump(verbosity_level: Option<VerbosityLevel>, streamer_message: S
             });
     };
 }
-
