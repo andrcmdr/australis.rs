@@ -32,16 +32,16 @@ pub struct Context {
     pub creds_path: Option<std::path::PathBuf>,
     /// Borealis Bus (NATS based MOM/MQ/SOA service bus) protocol://address:port
     /// Example: "nats://borealis.aurora.dev:4222" or "tls://borealis.aurora.dev:4443" for TLS connection
-    ///  default_value = "tls://eastcoast.nats.backend.aurora.dev:4222,tls://westcoast.nats.backend.aurora.dev:4222"
+    /// default_value = "tls://eastcoast.nats.backend.aurora.dev:4222,tls://westcoast.nats.backend.aurora.dev:4222"
     pub nats_server: String,
     /// Consumer work mode (standard `Subscriber` or `JetStream` subscriber)
-    ///  default_value = "JetStream"
+    /// default_value = "JetStream"
     pub work_mode: WorkMode,
     /// Consumer subject, for subscription and to take messages from
-    ///  default_value = "BlockIndex_StreamerMessages"
+    /// default_value = "BlockIndex_StreamerMessages"
     pub subject: String,
     /// Consuming messages format (`CBOR` or `JSON`), suffix for subject name
-    ///  default_value = "CBOR"
+    /// default_value = "CBOR"
     pub msg_format: MsgFormat,
 }
 
@@ -151,755 +151,839 @@ pub fn init_logging() {
         .init();
 }
 
+/// Data provider methods from Context for Consumer trait
+impl Consumer for Context {
+    /// root CA certificate
+    fn root_cert_path(&self) -> Option<std::path::PathBuf> {
+        return self.to_owned().root_cert_path;
+    }
+
+    /// client certificate
+    fn client_cert_path(&self) -> Option<std::path::PathBuf> {
+        return  self.to_owned().client_cert_path;
+    }
+
+    /// client private key
+    fn client_private_key(&self) -> Option<std::path::PathBuf> {
+        return self.to_owned().client_private_key;
+    }
+
+    /// Path to NATS credentials (JWT/NKEY tokens)
+    fn creds_path(&self) -> Option<std::path::PathBuf> {
+        return self.to_owned().creds_path;
+    }
+
+    /// Borealis Bus (NATS based MOM/MQ/SOA service bus) protocol://address:port
+    /// Example: "nats://borealis.aurora.dev:4222" or "tls://borealis.aurora.dev:4443" for TLS connection
+    /// default_value = "tls://eastcoast.nats.backend.aurora.dev:4222,tls://westcoast.nats.backend.aurora.dev:4222"
+    fn nats_server(&self) -> String {
+        return self.to_owned().nats_server;
+    }
+
+    /// Consumer work mode (standard `Subscriber` or `JetStream` subscriber)
+    /// default_value = "JetStream"
+    fn work_mode(&self) -> WorkMode {
+        return self.work_mode;
+    }
+
+    /// Consumer subject, for subscription and to take messages from
+    /// default_value = "BlockIndex_StreamerMessages"
+    fn subject(&self) -> String {
+        return self.to_owned().subject;
+    }
+
+    /// Consuming messages format (`CBOR` or `JSON`), suffix for subject name
+    /// default_value = "CBOR"
+    fn msg_format(&self) -> MsgFormat {
+        return self.msg_format;
+    }
+}
+
 /// Consumer's methods for Borealis NATS Bus
-// #[async_trait]
 pub trait Consumer {
-    fn nats_connect(self) -> nats::Connection;
-    fn nats_check_connection(nats_connection: &nats::Connection);
-}
+    /// root CA certificate
+    fn root_cert_path(&self) -> Option<std::path::PathBuf>;
 
-// #[async_trait]
-// impl Consumer for Context {}
+    /// client certificate
+    fn client_cert_path(&self) -> Option<std::path::PathBuf>;
 
-/// Create connection to Borealis NATS Bus
-pub fn nats_connect(context: Context) -> nats::Connection {
-    let creds_path = context
-        .creds_path
-        .unwrap_or(std::path::PathBuf::from("./.nats/seed/nats.creds"));
+    /// client private key
+    fn client_private_key(&self) -> Option<std::path::PathBuf>;
 
-    let options = match (
-        context.root_cert_path,
-        context.client_cert_path,
-        context.client_private_key,
-    ) {
-        (Some(root_cert_path), None, None) => {
-            nats::Options::with_credentials(creds_path)
-                .with_name("Borealis Indexer [TLS, Server Auth]")
-                .tls_required(true)
-                .add_root_certificate(root_cert_path)
-                .reconnect_buffer_size(1024 * 1024 * 1024)
-                .max_reconnects(100000)
-                .reconnect_callback(
-                    || info!(target: "borealis_consumer", "connection has been reestablished"),
-                )
-                .reconnect_delay_callback(|reconnect_try| {
-                    let reconnect_attempt = {
-                        if reconnect_try == 0 {
-                            1 as usize
-                        } else {
-                            reconnect_try
-                        }
-                    };
-                    let delay = core::time::Duration::from_millis(std::cmp::min(
-                        (reconnect_attempt
-                            * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
-                            as u64,
-                        1000,
-                    ));
-                    info!(
-                        target: "borealis_consumer",
-                        "reconnection attempt #{} within delay of {:?} ...",
-                        reconnect_attempt, delay
-                    );
-                    delay
-                })
-                .disconnect_callback(
-                    || info!(target: "borealis_consumer", "connection has been lost"),
-                ) // todo: re-run message consumer
-                .close_callback(|| info!(target: "borealis_consumer", "connection has been closed"))
-            // todo: re-run message consumer
-        }
-        (Some(root_cert_path), Some(client_cert_path), Some(client_private_key)) => {
-            nats::Options::with_credentials(creds_path)
-                .with_name("Borealis Indexer [TLS, Server Auth, Client Auth]")
-                .tls_required(true)
-                .add_root_certificate(root_cert_path)
-                .client_cert(client_cert_path, client_private_key)
-                .reconnect_buffer_size(1024 * 1024 * 1024)
-                .max_reconnects(100000)
-                .reconnect_callback(
-                    || info!(target: "borealis_consumer", "connection has been reestablished"),
-                )
-                .reconnect_delay_callback(|reconnect_try| {
-                    let reconnect_attempt = {
-                        if reconnect_try == 0 {
-                            1 as usize
-                        } else {
-                            reconnect_try
-                        }
-                    };
-                    let delay = core::time::Duration::from_millis(std::cmp::min(
-                        (reconnect_attempt
-                            * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
-                            as u64,
-                        1000,
-                    ));
-                    info!(
-                        target: "borealis_consumer",
-                        "reconnection attempt #{} within delay of {:?} ...",
-                        reconnect_attempt, delay
-                    );
-                    delay
-                })
-                .disconnect_callback(
-                    || info!(target: "borealis_consumer", "connection has been lost"),
-                ) // todo: re-run message consumer
-                .close_callback(|| info!(target: "borealis_consumer", "connection has been closed"))
-            // todo: re-run message consumer
-        }
-        _ => {
-            nats::Options::with_credentials(creds_path)
-                .with_name("Borealis Indexer [NATS, without TLS]")
-                .reconnect_buffer_size(1024 * 1024 * 1024)
-                .max_reconnects(100000)
-                .reconnect_callback(
-                    || info!(target: "borealis_consumer", "connection has been reestablished"),
-                )
-                .reconnect_delay_callback(|reconnect_try| {
-                    let reconnect_attempt = {
-                        if reconnect_try == 0 {
-                            1 as usize
-                        } else {
-                            reconnect_try
-                        }
-                    };
-                    let delay = core::time::Duration::from_millis(std::cmp::min(
-                        (reconnect_attempt
-                            * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
-                            as u64,
-                        1000,
-                    ));
-                    info!(
-                        target: "borealis_consumer",
-                        "reconnection attempt #{} within delay of {:?} ...",
-                        reconnect_attempt, delay
-                    );
-                    delay
-                })
-                .disconnect_callback(
-                    || info!(target: "borealis_consumer", "connection has been lost"),
-                ) // todo: re-run message consumer
-                .close_callback(|| info!(target: "borealis_consumer", "connection has been closed"))
-            // todo: re-run message consumer
-        }
-    };
+    /// Path to NATS credentials (JWT/NKEY tokens)
+    fn creds_path(&self) -> Option<std::path::PathBuf>;
 
-    let nats_connection = options
-        .connect(context.nats_server.as_str())
-        .expect("NATS connection error or wrong credentials");
+    /// Borealis Bus (NATS based MOM/MQ/SOA service bus) protocol://address:port
+    /// Example: "nats://borealis.aurora.dev:4222" or "tls://borealis.aurora.dev:4443" for TLS connection
+    /// default_value = "tls://eastcoast.nats.backend.aurora.dev:4222,tls://westcoast.nats.backend.aurora.dev:4222"
+    fn nats_server(&self) -> String;
 
-    nats_connection
-}
+    /// Consumer work mode (standard `Subscriber` or `JetStream` subscriber)
+    /// default_value = "JetStream"
+    fn work_mode(&self) -> WorkMode;
 
-/// Check connection to Borealis NATS Bus
-pub fn nats_check_connection(nats_connection: &nats::Connection) {
-    //  info!(target: "borealis_consumer", "NATS Connection: {:?}", nats_connection);
-    info!(target: "borealis_consumer", "round trip time (rtt) between this client and the current NATS server: {:?}", nats_connection.rtt());
-    info!(target: "borealis_consumer", "this client IP address, as known by the current NATS server: {:?}", nats_connection.client_ip());
-    info!(target: "borealis_consumer", "this client ID, as known by the current NATS server: {:?}", nats_connection.client_id());
-    info!(target: "borealis_consumer", "maximum payload size the current NATS server will accept: {:?}", nats_connection.max_payload());
-}
+    /// Consumer subject, for subscription and to take messages from
+    /// default_value = "BlockIndex_StreamerMessages"
+    fn subject(&self) -> String;
 
-/// Initialization for JetStream consumers
-pub fn init(context: &Context) {
-    let nats_connection = nats_connect(context.to_owned());
-    let stream_info = jetstream_create_stream(
-        &nats_connection,
-        format!("{}_{}", context.subject, context.msg_format.to_string()),
-        Some(vec![format!(
-            "{}_{}",
-            context.subject,
-            context.msg_format.to_string()
-        )]),
-    );
-    let consumer = jetstream_create_consumer_from_context(context, &nats_connection);
+    /// Consuming messages format (`CBOR` or `JSON`), suffix for subject name
+    /// default_value = "CBOR"
+    fn msg_format(&self) -> MsgFormat;
 
-    info!(
-        target: "borealis_consumer",
-        "Initialized:\nStream:\n{:?}\nConsumer:\n{:?}\n{:?}\n{:?}\n{:?}\n{:?}",
-        stream_info,
-        consumer.nc,
-        consumer.stream,
-        consumer.cfg,
-        consumer.push_subscriber,
-        consumer.timeout
-    );
-}
+    /// Create connection to Borealis NATS Bus
+    fn nats_connect(&self) -> nats::Connection {
+        let creds_path = self
+            .creds_path()
+            .unwrap_or(std::path::PathBuf::from("./.nats/seed/nats.creds"));
 
-/// Create JetStream with initial stream name and consisting of exact subject names
-pub fn jetstream_create_stream(
-    nats_connection: &nats::Connection,
-    stream_name: String,
-    subject_names: Option<Vec<String>>,
-) -> StreamInfo {
-    // JetStreams cannot be created from NATS Client side due to restrictions on NATS server side, but this ability is still available in library for client side consumers
-    let stream_info = nats_connection.create_stream(StreamConfig {
-        name: stream_name,
-        discard: DiscardPolicy::Old,
-        subjects: subject_names,
-        duplicate_window: 86400,
-        retention: RetentionPolicy::Limits,
-        storage: StorageType::File,
-        ..Default::default()
-    }).expect("IO error, something went wrong while creating a new stream, maybe stream already exist");
+        let options = match (
+            self.root_cert_path(),
+            self.client_cert_path(),
+            self.client_private_key(),
+        ) {
+            (Some(root_cert_path), None, None) => {
+                nats::Options::with_credentials(creds_path)
+                    .with_name("Borealis Indexer [TLS, Server Auth]")
+                    .tls_required(true)
+                    .add_root_certificate(root_cert_path)
+                    .reconnect_buffer_size(1024 * 1024 * 1024)
+                    .max_reconnects(100000)
+                    .reconnect_callback(
+                        || info!(target: "borealis_consumer", "connection has been reestablished"),
+                    )
+                    .reconnect_delay_callback(|reconnect_try| {
+                        let reconnect_attempt = {
+                            if reconnect_try == 0 {
+                                1 as usize
+                            } else {
+                                reconnect_try
+                            }
+                        };
+                        let delay = core::time::Duration::from_millis(std::cmp::min(
+                            (reconnect_attempt
+                                * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
+                                as u64,
+                            1000,
+                        ));
+                        info!(
+                            target: "borealis_consumer",
+                            "reconnection attempt #{} within delay of {:?} ...",
+                            reconnect_attempt, delay
+                        );
+                        delay
+                    })
+                    .disconnect_callback(
+                        || info!(target: "borealis_consumer", "connection has been lost"),
+                    ) // todo: re-run message consumer
+                    .close_callback(|| info!(target: "borealis_consumer", "connection has been closed"))
+                // todo: re-run message consumer
+            }
+            (Some(root_cert_path), Some(client_cert_path), Some(client_private_key)) => {
+                nats::Options::with_credentials(creds_path)
+                    .with_name("Borealis Indexer [TLS, Server Auth, Client Auth]")
+                    .tls_required(true)
+                    .add_root_certificate(root_cert_path)
+                    .client_cert(client_cert_path, client_private_key)
+                    .reconnect_buffer_size(1024 * 1024 * 1024)
+                    .max_reconnects(100000)
+                    .reconnect_callback(
+                        || info!(target: "borealis_consumer", "connection has been reestablished"),
+                    )
+                    .reconnect_delay_callback(|reconnect_try| {
+                        let reconnect_attempt = {
+                            if reconnect_try == 0 {
+                                1 as usize
+                            } else {
+                                reconnect_try
+                            }
+                        };
+                        let delay = core::time::Duration::from_millis(std::cmp::min(
+                            (reconnect_attempt
+                                * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
+                                as u64,
+                            1000,
+                        ));
+                        info!(
+                            target: "borealis_consumer",
+                            "reconnection attempt #{} within delay of {:?} ...",
+                            reconnect_attempt, delay
+                        );
+                        delay
+                    })
+                    .disconnect_callback(
+                        || info!(target: "borealis_consumer", "connection has been lost"),
+                    ) // todo: re-run message consumer
+                    .close_callback(|| info!(target: "borealis_consumer", "connection has been closed"))
+                // todo: re-run message consumer
+            }
+            _ => {
+                nats::Options::with_credentials(creds_path)
+                    .with_name("Borealis Indexer [NATS, without TLS]")
+                    .reconnect_buffer_size(1024 * 1024 * 1024)
+                    .max_reconnects(100000)
+                    .reconnect_callback(
+                        || info!(target: "borealis_consumer", "connection has been reestablished"),
+                    )
+                    .reconnect_delay_callback(|reconnect_try| {
+                        let reconnect_attempt = {
+                            if reconnect_try == 0 {
+                                1 as usize
+                            } else {
+                                reconnect_try
+                            }
+                        };
+                        let delay = core::time::Duration::from_millis(std::cmp::min(
+                            (reconnect_attempt
+                                * rand::Rng::gen_range(&mut rand::thread_rng(), 100..1000))
+                                as u64,
+                            1000,
+                        ));
+                        info!(
+                            target: "borealis_consumer",
+                            "reconnection attempt #{} within delay of {:?} ...",
+                            reconnect_attempt, delay
+                        );
+                        delay
+                    })
+                    .disconnect_callback(
+                        || info!(target: "borealis_consumer", "connection has been lost"),
+                    ) // todo: re-run message consumer
+                    .close_callback(|| info!(target: "borealis_consumer", "connection has been closed"))
+                // todo: re-run message consumer
+            }
+        };
 
-    info!(
-        target: "borealis_consumer",
-        "Initialized:\nStream:\n{:?}",
+        let nats_connection = options
+            .connect(self.nats_server().as_str())
+            .expect("NATS connection error or wrong credentials");
+
+        nats_connection
+    }
+
+    /// Check connection to Borealis NATS Bus
+    fn nats_check_connection(&self, nats_connection: &nats::Connection) {
+        // info!(target: "borealis_consumer", "NATS Connection: {:?}", nats_connection);
+        info!(target: "borealis_consumer", "round trip time (rtt) between this client and the current NATS server: {:?}", nats_connection.rtt());
+        info!(target: "borealis_consumer", "this client IP address, as known by the current NATS server: {:?}", nats_connection.client_ip());
+        info!(target: "borealis_consumer", "this client ID, as known by the current NATS server: {:?}", nats_connection.client_id());
+        info!(target: "borealis_consumer", "maximum payload size the current NATS server will accept: {:?}", nats_connection.max_payload());
+    }
+
+    /// Initialization for JetStream consumers
+    fn init(&self) {
+        let nats_connection = self.nats_connect();
+        let stream_info = self.jetstream_create_stream(
+            &nats_connection,
+            format!("{}_{}", self.subject(), self.msg_format().to_string()),
+            Some(vec![format!(
+                "{}_{}",
+                self.subject(),
+                self.msg_format().to_string()
+            )]),
+        );
+        let consumer = self.jetstream_create_consumer_from_context(&nats_connection);
+
+        info!(
+            target: "borealis_consumer",
+            "Initialized:\nStream:\n{:?}\nConsumer:\n{:?}\n{:?}\n{:?}\n{:?}\n{:?}",
+            stream_info,
+            consumer.nc,
+            consumer.stream,
+            consumer.cfg,
+            consumer.push_subscriber,
+            consumer.timeout
+        );
+    }
+
+    /// Create JetStream with initial stream name and consisting of exact subject names
+    fn jetstream_create_stream(
+        &self,
+        nats_connection: &nats::Connection,
+        stream_name: String,
+        subject_names: Option<Vec<String>>,
+    ) -> StreamInfo {
+        // JetStreams cannot be created from NATS Client side due to restrictions on NATS server side, but this ability is still available in library for client side consumers
+        let stream_info = nats_connection.create_stream(StreamConfig {
+            name: stream_name,
+            discard: DiscardPolicy::Old,
+            subjects: subject_names,
+            duplicate_window: 86400,
+            retention: RetentionPolicy::Limits,
+            storage: StorageType::File,
+            ..Default::default()
+        }).expect("IO error, something went wrong while creating a new stream, maybe stream already exist");
+
+        info!(
+            target: "borealis_consumer",
+            "Initialized:\nStream:\n{:?}",
+            stream_info
+        );
+
         stream_info
-    );
+    }
 
-    stream_info
-}
+    /// Create JetStream consumer with custom parameters
+    /// (see NATS documentation descrption for the meaning of particular ConsumerConfig parameters)
+    fn jetstream_create_consumer(
+        &self,
+        nats_connection: &nats::Connection,
+        stream_name: String,
+        deliver_subject: Option<String>,
+        durable_name: Option<String>,
+        filter_subject: String,
+    ) -> JetStreamConsumer {
+        let consumer = JetStreamConsumer::create_or_open(nats_connection.to_owned(), stream_name.as_str(), ConsumerConfig {
+            deliver_subject,
+            durable_name,
+            deliver_policy: DeliverPolicy::Last,
+            ack_policy: AckPolicy::Explicit,
+            filter_subject,
+            replay_policy: ReplayPolicy::Instant,
+            ..Default::default()
+        }).expect("IO error, something went wrong while creating a new consumer or returning an existent consumer");
 
-/// Create JetStream consumer with custom parameters
-/// (see NATS documentation descrption for the meaning of particular ConsumerConfig parameters)
-pub fn jetstream_create_consumer(
-    nats_connection: &nats::Connection,
-    stream_name: String,
-    deliver_subject: Option<String>,
-    durable_name: Option<String>,
-    filter_subject: String,
-) -> JetStreamConsumer {
-    let consumer = JetStreamConsumer::create_or_open(nats_connection.to_owned(), stream_name.as_str(), ConsumerConfig {
-        deliver_subject,
-        durable_name,
-        deliver_policy: DeliverPolicy::Last,
-        ack_policy: AckPolicy::Explicit,
-        filter_subject,
-        replay_policy: ReplayPolicy::Instant,
-        ..Default::default()
-    }).expect("IO error, something went wrong while creating a new consumer or returning an existent consumer");
+        info!(
+            target: "borealis_consumer",
+            "Initialized:\nConsumer:\n{:?}\n{:?}\n{:?}\n{:?}\n{:?}",
+            consumer.nc,
+            consumer.stream,
+            consumer.cfg,
+            consumer.push_subscriber,
+            consumer.timeout
+        );
 
-    info!(
-        target: "borealis_consumer",
-        "Initialized:\nConsumer:\n{:?}\n{:?}\n{:?}\n{:?}\n{:?}",
-        consumer.nc,
-        consumer.stream,
-        consumer.cfg,
-        consumer.push_subscriber,
-        consumer.timeout
-    );
+        consumer
+    }
 
-    consumer
-}
+    /// Create JetStream consumer to consume messages after message with exact sequential number
+    fn jetstream_create_consumer_from_start_seq(
+        &self,
+        nats_connection: &nats::Connection,
+        stream_name: String,
+        deliver_subject: Option<String>,
+        durable_name: Option<String>,
+        filter_subject: String,
+        start_seq: Option<i64>,
+    ) -> JetStreamConsumer {
+        let consumer = JetStreamConsumer::create_or_open(nats_connection.to_owned(), stream_name.as_str(), ConsumerConfig {
+            deliver_subject,
+            durable_name,
+            deliver_policy: DeliverPolicy::ByStartSeq,
+            ack_policy: AckPolicy::Explicit,
+            filter_subject,
+            replay_policy: ReplayPolicy::Instant,
+            opt_start_seq: match start_seq {
+                Some(seq) => seq,
+                None => Default::default(),
+            },
+            ..Default::default()
+        }).expect("IO error, something went wrong while creating a new consumer or returning an existent consumer");
 
-/// Create JetStream consumer to consume messages after message with exact sequential number
-pub fn jetstream_create_consumer_from_start_seq(
-    nats_connection: &nats::Connection,
-    stream_name: String,
-    deliver_subject: Option<String>,
-    durable_name: Option<String>,
-    filter_subject: String,
-    start_seq: Option<i64>,
-) -> JetStreamConsumer {
-    let consumer = JetStreamConsumer::create_or_open(nats_connection.to_owned(), stream_name.as_str(), ConsumerConfig {
-        deliver_subject,
-        durable_name,
-        deliver_policy: DeliverPolicy::ByStartSeq,
-        ack_policy: AckPolicy::Explicit,
-        filter_subject,
-        replay_policy: ReplayPolicy::Instant,
-        opt_start_seq: match start_seq {
-            Some(seq) => seq,
-            None => Default::default(),
-        },
-        ..Default::default()
-    }).expect("IO error, something went wrong while creating a new consumer or returning an existent consumer");
+        info!(
+            target: "borealis_consumer",
+            "Initialized:\nConsumer:\n{:?}\n{:?}\n{:?}\n{:?}\n{:?}",
+            consumer.nc,
+            consumer.stream,
+            consumer.cfg,
+            consumer.push_subscriber,
+            consumer.timeout
+        );
 
-    info!(
-        target: "borealis_consumer",
-        "Initialized:\nConsumer:\n{:?}\n{:?}\n{:?}\n{:?}\n{:?}",
-        consumer.nc,
-        consumer.stream,
-        consumer.cfg,
-        consumer.push_subscriber,
-        consumer.timeout
-    );
+        consumer
+    }
 
-    consumer
-}
+    /// Create JetStream consumer to consume messages after message with exact timestamp
+    fn jetstream_create_consumer_from_start_time(
+        &self,
+        nats_connection: &nats::Connection,
+        stream_name: String,
+        deliver_subject: Option<String>,
+        durable_name: Option<String>,
+        filter_subject: String,
+        start_time: Option<ChronoDateTime<Utc>>,
+    ) -> JetStreamConsumer {
+        let consumer = JetStreamConsumer::create_or_open(nats_connection.to_owned(), stream_name.as_str(), ConsumerConfig {
+            deliver_subject,
+            durable_name,
+            deliver_policy: DeliverPolicy::ByStartTime,
+            ack_policy: AckPolicy::Explicit,
+            filter_subject,
+            replay_policy: ReplayPolicy::Instant,
+            opt_start_time: match start_time {
+                Some(time) => Some(DateTime(time)),
+                None => Default::default(),
+            },
+            ..Default::default()
+        }).expect("IO error, something went wrong while creating a new consumer or returning an existent consumer");
 
-/// Create JetStream consumer to consume messages after message with exact timestamp
-pub fn jetstream_create_consumer_from_start_time(
-    nats_connection: &nats::Connection,
-    stream_name: String,
-    deliver_subject: Option<String>,
-    durable_name: Option<String>,
-    filter_subject: String,
-    start_time: Option<ChronoDateTime<Utc>>,
-) -> JetStreamConsumer {
-    let consumer = JetStreamConsumer::create_or_open(nats_connection.to_owned(), stream_name.as_str(), ConsumerConfig {
-        deliver_subject,
-        durable_name,
-        deliver_policy: DeliverPolicy::ByStartTime,
-        ack_policy: AckPolicy::Explicit,
-        filter_subject,
-        replay_policy: ReplayPolicy::Instant,
-        opt_start_time: match start_time {
-            Some(time) => Some(DateTime(time)),
-            None => Default::default(),
-        },
-        ..Default::default()
-    }).expect("IO error, something went wrong while creating a new consumer or returning an existent consumer");
+        info!(
+            target: "borealis_consumer",
+            "Initialized:\nConsumer:\n{:?}\n{:?}\n{:?}\n{:?}\n{:?}",
+            consumer.nc,
+            consumer.stream,
+            consumer.cfg,
+            consumer.push_subscriber,
+            consumer.timeout
+        );
 
-    info!(
-        target: "borealis_consumer",
-        "Initialized:\nConsumer:\n{:?}\n{:?}\n{:?}\n{:?}\n{:?}",
-        consumer.nc,
-        consumer.stream,
-        consumer.cfg,
-        consumer.push_subscriber,
-        consumer.timeout
-    );
+        consumer
+    }
 
-    consumer
-}
+    /// Create JetStream consumer from Context parameters
+    /// (see documentation descrption for the meaning of particular Context and ConsumerConfig parameters)
+    fn jetstream_create_consumer_from_context(
+        &self,
+        nats_connection: &nats::Connection,
+    ) -> JetStreamConsumer {
+        let consumer = JetStreamConsumer::create_or_open(nats_connection.to_owned(), format!("{}_{}", self.subject(), self.msg_format().to_string()).as_str(), ConsumerConfig {
+            deliver_subject: Some(format!("{}_{}", self.subject(), self.msg_format().to_string())),
+            durable_name: Some(format!("Borealis_Consumer_{}_{}", self.subject(), self.msg_format().to_string())),
+            deliver_policy: DeliverPolicy::Last,
+            ack_policy: AckPolicy::Explicit,
+            filter_subject: format!("{}_{}", self.subject(), self.msg_format().to_string()),
+            replay_policy: ReplayPolicy::Instant,
+            ..Default::default()
+        }).expect("IO error, something went wrong while creating a new consumer or returning an existent consumer");
 
-/// Create JetStream consumer from Context parameters
-/// (see documentation descrption for the meaning of particular Context and ConsumerConfig parameters)
-pub fn jetstream_create_consumer_from_context(
-    context: &Context,
-    nats_connection: &nats::Connection,
-) -> JetStreamConsumer {
-    let consumer = JetStreamConsumer::create_or_open(nats_connection.to_owned(), format!("{}_{}", context.subject, context.msg_format.to_string()).as_str(), ConsumerConfig {
-        deliver_subject: Some(format!("{}_{}", context.subject, context.msg_format.to_string())),
-        durable_name: Some(format!("Borealis_Consumer_{}_{}", context.subject, context.msg_format.to_string())),
-        deliver_policy: DeliverPolicy::Last,
-        ack_policy: AckPolicy::Explicit,
-        filter_subject: format!("{}_{}", context.subject, context.msg_format.to_string()),
-        replay_policy: ReplayPolicy::Instant,
-        ..Default::default()
-    }).expect("IO error, something went wrong while creating a new consumer or returning an existent consumer");
+        info!(
+            target: "borealis_consumer",
+            "Initialized:\nConsumer:\n{:?}\n{:?}\n{:?}\n{:?}\n{:?}",
+            consumer.nc,
+            consumer.stream,
+            consumer.cfg,
+            consumer.push_subscriber,
+            consumer.timeout
+        );
 
-    info!(
-        target: "borealis_consumer",
-        "Initialized:\nConsumer:\n{:?}\n{:?}\n{:?}\n{:?}\n{:?}",
-        consumer.nc,
-        consumer.stream,
-        consumer.cfg,
-        consumer.push_subscriber,
-        consumer.timeout
-    );
+        consumer
+    }
 
-    consumer
-}
+    /// Get names for all JetStream streams from NATS server
+    fn get_stream_names(&self, nats_connection: &nats::Connection) {
+        nats_connection
+            .stream_names()
+            .for_each(|stream_name| match stream_name {
+                Ok(stream_name) => {
+                    info!(
+                        target: "borealis_consumer",
+                        "Stream name: {}",
+                        stream_name
+                    );
+                }
+                Err(error) => {
+                    info!(
+                        target: "borealis_consumer",
+                        "Error during retrieving a stream name: {}",
+                        error
+                    );
+                }
+            });
+    }
 
-/// Get names for all JetStream streams from NATS server
-pub fn get_stream_names(nats_connection: &nats::Connection) {
-    nats_connection
-        .stream_names()
-        .for_each(|stream_name| match stream_name {
-            Ok(stream_name) => {
-                info!(
-                    target: "borealis_consumer",
-                    "Stream name: {}",
-                    stream_name
-                );
-            }
-            Err(error) => {
-                info!(
-                    target: "borealis_consumer",
-                    "Error during retrieving a stream name: {}",
-                    error
-                );
-            }
-        });
-}
+    /// Get full information about all JetStream streams from NATS server
+    fn get_streams_list(&self, nats_connection: &nats::Connection) {
+        nats_connection
+            .list_streams()
+            .for_each(|stream_info| match stream_info {
+                Ok(stream_info) => {
+                    info!(
+                        target: "borealis_consumer",
+                        "Stream information: {:?}",
+                        stream_info
+                    );
+                }
+                Err(error) => {
+                    info!(
+                        target: "borealis_consumer",
+                        "Error during retrieving a stream information: {}",
+                        error
+                    );
+                }
+            });
+    }
 
-/// Get full information about all JetStream streams from NATS server
-pub fn get_streams_list(nats_connection: &nats::Connection) {
-    nats_connection
-        .list_streams()
-        .for_each(|stream_info| match stream_info {
+    /// Get full information about particular JetStream stream from NATS server
+    fn get_stream_info(
+        &self,
+        nats_connection: &nats::Connection,
+        stream_name: String,
+    ) -> std::io::Result<StreamInfo> {
+        match nats_connection.stream_info(stream_name.as_str()) {
             Ok(stream_info) => {
                 info!(
                     target: "borealis_consumer",
-                    "Stream information: {:?}",
+                    "Stream {} information: {:?}",
+                    stream_name,
                     stream_info
                 );
+                Ok(stream_info)
             }
             Err(error) => {
                 info!(
                     target: "borealis_consumer",
-                    "Error during retrieving a stream information: {}",
+                    "Error during retrieving a stream {} information: {}",
+                    stream_name,
+                    error
+                );
+                Err(error)
+            }
+        }
+    }
+
+    /// Get full information about all JetStream consumers created for particular stream from NATS server
+    fn get_consumers_list(&self, nats_connection: &nats::Connection, stream_name: String) {
+        match nats_connection.list_consumers(stream_name.as_str()) {
+            Ok(consumers_list) => {
+                consumers_list.for_each(|consumer_info| {
+                    if let Ok(consumer_info) = consumer_info {
+                        info!(
+                            target: "borealis_consumer",
+                            "Consumer information for stream {}: {:?}",
+                            stream_name,
+                            consumer_info
+                        );
+                    } else if let Err(error) = consumer_info {
+                        info!(
+                            target: "borealis_consumer",
+                            "Error during retrieving a consumer information for stream {}: {}",
+                            stream_name,
+                            error
+                        );
+                    };
+                });
+            }
+            Err(error) => {
+                info!(
+                    target: "borealis_consumer",
+                    "Error during retrieving a consumer list for stream {}: {}",
+                    stream_name,
                     error
                 );
             }
+        }
+    }
+
+    /// Get full information about certain JetStream consumer created for particular stream from NATS server
+    fn get_consumer_info(
+        &self,
+        nats_connection: &nats::Connection,
+        stream_name: String,
+        consumer_name: String,
+    ) -> std::io::Result<ConsumerInfo> {
+        match nats_connection.consumer_info(stream_name.as_str(), consumer_name.as_str()) {
+            Ok(consumer_info) => {
+                info!(
+                    target: "borealis_consumer",
+                    "Consumer {} information for stream {}: {:?}",
+                    consumer_name,
+                    stream_name,
+                    consumer_info
+                );
+                Ok(consumer_info)
+            }
+            Err(error) => {
+                info!(
+                    target: "borealis_consumer",
+                    "Error during retrieving a consumer {} information for stream {}: {}",
+                    consumer_name,
+                    stream_name,
+                    error
+                );
+                Err(error)
+            }
+        }
+    }
+
+    /// Get full information about JetStream client account from NATS server
+    fn get_jetstream_account_info(
+        &self,
+        nats_connection: &nats::Connection,
+    ) -> std::io::Result<AccountInfo> {
+        match nats_connection.account_info() {
+            Ok(account_info) => {
+                info!(
+                    target: "borealis_consumer",
+                    "JetStream account information: {:?}",
+                    account_info
+                );
+                Ok(account_info)
+            }
+            Err(error) => {
+                info!(
+                    target: "borealis_consumer",
+                    "Error during retrieving a JetStream account information: {}",
+                    error
+                );
+                Err(error)
+            }
+        }
+    }
+
+    /// Create subscription to NATS subject
+    fn create_subscription(
+        &self,
+        nats_connection: &nats::Connection,
+        subject_name: String,
+    ) -> nats::Subscription {
+        let subscription = nats_connection
+            .subscribe(subject_name.as_str())
+            .expect("Subscription error: maybe wrong or nonexistent `subject` name");
+        subscription
+    }
+
+    /// Create subscription to NATS subject from Context parameters
+    /// (see documentation descrption for the meaning of particular Context parameters)
+    fn create_subscription_from_context(
+        &self,
+        nats_connection: &nats::Connection,
+    ) -> nats::Subscription {
+        let subscription = nats_connection
+            .subscribe(format!("{}_{}", self.subject(), self.msg_format().to_string()).as_str())
+            .expect("Subscription error: maybe wrong or nonexistent `subject` name");
+        subscription
+    }
+
+    /// Run Borealis Consumer with messages listener for Borealis NATS Bus
+    fn run(&self) {
+        let nats_connection = self.nats_connect();
+        let system = actix::System::new();
+        system.block_on(async move {
+            self.listen_messages(&nats_connection);
         });
-}
-
-/// Get full information about particular JetStream stream from NATS server
-pub fn get_stream_info(
-    nats_connection: &nats::Connection,
-    stream_name: String,
-) -> std::io::Result<StreamInfo> {
-    match nats_connection.stream_info(stream_name.as_str()) {
-        Ok(stream_info) => {
-            info!(
-                target: "borealis_consumer",
-                "Stream {} information: {:?}",
-                stream_name,
-                stream_info
-            );
-            Ok(stream_info)
-        }
-        Err(error) => {
-            info!(
-                target: "borealis_consumer",
-                "Error during retrieving a stream {} information: {}",
-                stream_name,
-                error
-            );
-            Err(error)
-        }
+        system.run().unwrap();
     }
-}
 
-/// Get full information about all JetStream consumers created for particular stream from NATS server
-pub fn get_consumers_list(nats_connection: &nats::Connection, stream_name: String) {
-    match nats_connection.list_consumers(stream_name.as_str()) {
-        Ok(consumers_list) => {
-            consumers_list.for_each(|consumer_info| {
-                if let Ok(consumer_info) = consumer_info {
+    /// Listen NATS messages from particular subject subscription
+    /// or from JetStream stream with parameters set in Context type
+    fn listen_messages(&self, nats_connection: &nats::Connection) {
+        match self.work_mode() {
+            WorkMode::Subscriber => {
+                let subscription = self.create_subscription_from_context(&nats_connection);
+                let timeout = std::time::Duration::from_millis(10000);
+                loop {
                     info!(
                         target: "borealis_consumer",
-                        "Consumer information for stream {}: {:?}",
-                        stream_name,
-                        consumer_info
+                        "Message consumer loop started: listening for new messages\n"
                     );
-                } else if let Err(error) = consumer_info {
-                    info!(
-                        target: "borealis_consumer",
-                        "Error during retrieving a consumer information for stream {}: {}",
-                        stream_name,
-                        error
-                    );
-                };
-            });
-        }
-        Err(error) => {
-            info!(
-                target: "borealis_consumer",
-                "Error during retrieving a consumer list for stream {}: {}",
-                stream_name,
-                error
-            );
-        }
-    }
-}
-
-/// Get full information about certain JetStream consumer created for particular stream from NATS server
-pub fn get_consumer_info(
-    nats_connection: &nats::Connection,
-    stream_name: String,
-    consumer_name: String,
-) -> std::io::Result<ConsumerInfo> {
-    match nats_connection.consumer_info(stream_name.as_str(), consumer_name.as_str()) {
-        Ok(consumer_info) => {
-            info!(
-                target: "borealis_consumer",
-                "Consumer {} information for stream {}: {:?}",
-                consumer_name,
-                stream_name,
-                consumer_info
-            );
-            Ok(consumer_info)
-        }
-        Err(error) => {
-            info!(
-                target: "borealis_consumer",
-                "Error during retrieving a consumer {} information for stream {}: {}",
-                consumer_name,
-                stream_name,
-                error
-            );
-            Err(error)
-        }
-    }
-}
-
-/// Get full information about JetStream client account from NATS server
-pub fn get_jetstream_account_info(
-    nats_connection: &nats::Connection,
-) -> std::io::Result<AccountInfo> {
-    match nats_connection.account_info() {
-        Ok(account_info) => {
-            info!(
-                target: "borealis_consumer",
-                "JetStream account information: {:?}",
-                account_info
-            );
-            Ok(account_info)
-        }
-        Err(error) => {
-            info!(
-                target: "borealis_consumer",
-                "Error during retrieving a JetStream account information: {}",
-                error
-            );
-            Err(error)
-        }
-    }
-}
-
-/// Create subscription to NATS subject
-pub fn create_subscription(
-    nats_connection: &nats::Connection,
-    subject_name: String,
-) -> nats::Subscription {
-    let subscription = nats_connection
-        .subscribe(subject_name.as_str())
-        .expect("Subscription error: maybe wrong or nonexistent `--subject` name");
-    subscription
-}
-
-/// Create subscription to NATS subject from Context parameters
-/// (see documentation descrption for the meaning of particular Context parameters)
-pub fn create_subscription_from_context(
-    context: &Context,
-    nats_connection: &nats::Connection,
-) -> nats::Subscription {
-    let subscription = nats_connection
-        .subscribe(format!("{}_{}", context.subject, context.msg_format.to_string()).as_str())
-        .expect("Subscription error: maybe wrong or nonexistent `--subject` name");
-    subscription
-}
-
-/// Run Borealis Consumer with messages listener for Borealis NATS Bus
-pub fn run(context: &Context) {
-    let nats_connection = nats_connect(context.to_owned());
-    let system = actix::System::new();
-    system.block_on(async move {
-        listen_messages(context, &nats_connection);
-    });
-    system.run().unwrap();
-}
-
-/// Listen NATS messages from particular subject subscription or from JetStream stream with parameters set in Context type
-pub fn listen_messages(context: &Context, nats_connection: &nats::Connection) {
-    match context.work_mode {
-        WorkMode::Subscriber => {
-            let subscription = create_subscription_from_context(context, &nats_connection);
-            loop {
-                info!(
-                    target: "borealis_consumer",
-                    "Message consumer loop started: listening for new messages\n"
-                );
-                if let Ok(msg) = subscription.next_timeout(std::time::Duration::from_millis(10000))
-                {
-                    info!(target: "borealis_consumer", "Received message:\n{}", &msg);
-                    handle_message(context, msg);
-                } else {
-                    info!(
-                        target: "borealis_consumer",
-                        "Message wasn't received within 10s timeframe: Error occured due to waiting timeout for message receiving was elapsed\n"
-                    );
-                };
+                    if let Ok(msg) = subscription.next_timeout(timeout)
+                    {
+                        info!(target: "borealis_consumer", "Received message:\n{}", &msg);
+                        self.handle_message(msg);
+                    } else {
+                        info!(
+                            target: "borealis_consumer",
+                            "Message wasn't received within {:?} timeframe: Error occured due to waiting timeout for message receiving was elapsed\n",
+                            timeout
+                        );
+                    };
+                }
             }
-        }
-        WorkMode::Jetstream => {
-            let mut consumer = jetstream_create_consumer_from_context(context, &nats_connection);
-            consumer.timeout = std::time::Duration::from_millis(10000);
-            loop {
-                info!(
-                    target: "borealis_consumer",
-                    "Message JetStream consumer loop started: listening for new messages\n"
-                );
-                if let Ok(message) = consumer.process_timeout(|msg| {
-                    info!(target: "borealis_consumer", "Received message:\n{}", msg);
-                    Ok(msg.to_owned())
-                }) {
-                    handle_message(context, message);
-                } else {
+            WorkMode::Jetstream => {
+                let mut consumer = self.jetstream_create_consumer_from_context(&nats_connection);
+                consumer.timeout = std::time::Duration::from_millis(10000);
+                loop {
                     info!(
                         target: "borealis_consumer",
-                        "Message wasn't received within 10s timeframe: Error occured due to waiting timeout for message receiving was elapsed\n"
+                        "Message JetStream consumer loop started: listening for new messages\n"
                     );
-                };
+                    if let Ok(message) = consumer.process_timeout(|msg| {
+                        info!(target: "borealis_consumer", "Received message:\n{}", msg);
+                        Ok(msg.to_owned())
+                    }) {
+                        self.handle_message(message);
+                    } else {
+                        info!(
+                            target: "borealis_consumer",
+                            "Message wasn't received within {:?} timeframe: Error occured due to waiting timeout for message receiving was elapsed\n",
+                            consumer.timeout
+                        );
+                    };
+                }
             }
         }
     }
-}
 
-/// Handle received NATS message (decode, extract `StreamerMessage` as payload, dump information from `StreamerMessage`)
-pub fn handle_message(context: &Context, msg: nats::Message) {
-    info!(
-        target: "borealis_consumer",
-        "Message consumer loop executed: message received\n"
-    );
+    /// Handle received NATS message
+    /// (decode, extract `StreamerMessage` as payload, dump information from `StreamerMessage`)
+    fn handle_message(&self, msg: nats::Message) {
+        info!(
+            target: "borealis_consumer",
+            "Message consumer loop executed: message received\n"
+        );
 
-    // Decoding of Borealis Message receved from NATS subject/jetstream
-    let borealis_message: BorealisMessage<StreamerMessage> = message_decode(context, msg);
-    // Get `StreamerMessage` from received Borealis Message
-    let streamer_message: StreamerMessage = borealis_message.payload;
-    message_dump(Some(VerbosityLevel::WithBlockHashHeight), streamer_message);
-}
+        // Decoding of Borealis Message receved from NATS subject/jetstream
+        let borealis_message: BorealisMessage<StreamerMessage> = self.message_decode(msg);
+        // Get `StreamerMessage` from received Borealis Message
+        let streamer_message: StreamerMessage = borealis_message.payload;
+        self.message_dump(Some(VerbosityLevel::WithBlockHashHeight), streamer_message);
+    }
 
-/// Handle received NATS message (with decoding and extraction of `StreamerMessage` as payload, dump information from `StreamerMessage`)
-pub fn handle_streamer_message(context: &Context, msg: nats::Message) {
-    info!(
-        target: "borealis_consumer",
-        "Message consumer loop executed: message received\n"
-    );
+    /// Handle received NATS message
+    /// (with decoding and extraction of `StreamerMessage` as payload, dump information from `StreamerMessage`)
+    fn handle_streamer_message(&self, msg: nats::Message) {
+        info!(
+            target: "borealis_consumer",
+            "Message consumer loop executed: message received\n"
+        );
 
-    // Get `StreamerMessage` from Borealis Message receved from NATS subject/jetstream
-    let streamer_message: StreamerMessage = message_get_payload(context, msg);
-    message_dump(Some(VerbosityLevel::WithBlockHashHeight), streamer_message);
-}
+        // Get `StreamerMessage` from Borealis Message receved from NATS subject/jetstream
+        let streamer_message: StreamerMessage = self.message_get_payload(msg);
+        self.message_dump(Some(VerbosityLevel::WithBlockHashHeight), streamer_message);
+    }
 
-/// Extract `StreamerMessage` as payload from received NATS message
-pub fn message_get_payload<T: DeserializeOwned>(context: &Context, msg: nats::Message) -> T {
-    // Decoding of Borealis Message receved from NATS subject/jetstream
-    let borealis_message: BorealisMessage<T> = message_decode(context, msg);
-    // Get `StreamerMessage` from received Borealis Message
-    let payload: T = borealis_message.payload;
-    payload
-}
+    /// Extract `StreamerMessage` as payload from received NATS message
+    fn message_get_payload<T: DeserializeOwned>(&self, msg: nats::Message) -> T {
+        // Decoding of Borealis Message receved from NATS subject/jetstream
+        let borealis_message: BorealisMessage<T> = self.message_decode(msg);
+        // Get `StreamerMessage` from received Borealis Message
+        let payload: T = borealis_message.payload;
+        payload
+    }
 
-/// Decode received NATS message from CBOR (of JSON)
-pub fn message_decode<T: DeserializeOwned>(
-    context: &Context,
-    msg: nats::Message,
-) -> BorealisMessage<T> {
-    // Decoding of Borealis Message receved from NATS subject/jetstream
-    let borealis_message: BorealisMessage<T> = match context.msg_format {
-        MsgFormat::Cbor => BorealisMessage::from_cbor(msg.data.as_ref())
-            .expect("[From CBOR bytes vector: message empty] Message decoding error"),
-        MsgFormat::Json => BorealisMessage::from_json_bytes(msg.data.as_ref())
-            .expect("[From JSON bytes vector: message empty] Message decoding error"),
-    };
-    borealis_message
-}
+    /// Decode received NATS message from CBOR (of JSON)
+    fn message_decode<T: DeserializeOwned>(
+        &self,
+        msg: nats::Message,
+    ) -> BorealisMessage<T> {
+        // Decoding of Borealis Message receved from NATS subject/jetstream
+        let borealis_message: BorealisMessage<T> = match self.msg_format() {
+            MsgFormat::Cbor => BorealisMessage::from_cbor(msg.data.as_ref())
+                .expect("[From CBOR bytes vector: message empty] Message decoding error"),
+            MsgFormat::Json => BorealisMessage::from_json_bytes(msg.data.as_ref())
+                .expect("[From JSON bytes vector: message empty] Message decoding error"),
+        };
+        borealis_message
+    }
 
-/// Dump information from `StreamerMessage` payload, extracted from received NATS message
-pub fn message_dump(verbosity_level: Option<VerbosityLevel>, streamer_message: StreamerMessage) {
-    // Data handling from `StreamerMessage` data structure. For custom filtering purposes.
-    // Same as: jq '{block_height: .block.header.height, block_hash: .block.header.hash, block_header_chunk: .block.chunks[0], shard_chunk_header: .shards[0].chunk.header, transactions: .shards[0].chunk.transactions, receipts: .shards[0].chunk.receipts, receipt_execution_outcomes: .shards[0].receipt_execution_outcomes, state_changes: .state_changes}'
+    /// Dump information from `StreamerMessage` payload, extracted from received NATS message
+    fn message_dump(&self, verbosity_level: Option<VerbosityLevel>, streamer_message: StreamerMessage) {
+        // Data handling from `StreamerMessage` data structure. For custom filtering purposes.
+        // Same as: jq '{block_height: .block.header.height, block_hash: .block.header.hash, block_header_chunk: .block.chunks[0], shard_chunk_header: .shards[0].chunk.header, transactions: .shards[0].chunk.transactions, receipts: .shards[0].chunk.receipts, receipt_execution_outcomes: .shards[0].receipt_execution_outcomes, state_changes: .state_changes}'
 
-    info!(
-        target: "borealis_consumer",
-        "block_height: #{}, block_hash: {}\n",
-        &streamer_message.block.header.height,
-        &streamer_message.block.header.hash
-    );
-
-    if let Some(_verbosity_level) = verbosity_level {
-        println!(
+        info!(
+            target: "borealis_consumer",
             "block_height: #{}, block_hash: {}\n",
-            &streamer_message.block.header.height, &streamer_message.block.header.hash
-        );
-    };
-
-    if let Some(VerbosityLevel::WithStreamerMessageDump)
-    | Some(VerbosityLevel::WithStreamerMessageParse) = verbosity_level
-    {
-        println!(
-            "streamer_message: {}\n",
-            serde_json::to_string_pretty(&streamer_message).unwrap()
-        );
-        println!(
-            "streamer_message: {}\n",
-            serde_json::to_string(&streamer_message).unwrap()
-        );
-    };
-
-    if let Some(VerbosityLevel::WithStreamerMessageParse) = verbosity_level {
-        println!(
-            "streamer_message: {}\n",
-            serde_json::to_value(&streamer_message).unwrap()
-        );
-        println!(
-            "streamer_message: {:?}\n",
-            cbor::to_vec(&streamer_message).unwrap()
+            &streamer_message.block.header.height,
+            &streamer_message.block.header.hash
         );
 
-        println!(
-            "block_header: {}\n",
-            serde_json::to_value(&streamer_message.block.header).unwrap()
-        );
-        println!(
-            "block_header: {:?}\n",
-            cbor::to_vec(&streamer_message.block.header).unwrap()
-        );
-
-        println!(
-            "block_header_chunks#: {}\n",
-            streamer_message.block.chunks.len()
-        );
-        streamer_message.block.chunks.iter().for_each(|chunk| {
+        if let Some(_verbosity_level) = verbosity_level {
             println!(
-                "block_header_chunk: {}\n",
-                serde_json::to_value(&chunk).unwrap()
+                "block_height: #{}, block_hash: {}\n",
+                &streamer_message.block.header.height, &streamer_message.block.header.hash
             );
-            println!("block_header_chunk: {:?}\n", cbor::to_vec(&chunk).unwrap());
-        });
+        };
 
-        println!("shards#: {}\n", streamer_message.shards.len());
-        streamer_message.shards.iter().for_each(|shard| {
-            if let Some(chunk) = &shard.chunk {
-                println!(
-                    "shard_chunk_header: {}\n",
-                    serde_json::to_value(&chunk.header).unwrap()
-                );
-                println!(
-                    "shard_chunk_header: {:?}\n",
-                    cbor::to_vec(&chunk.header).unwrap()
-                );
-
-                println!("shard_chunk_transactions#: {}\n", chunk.transactions.len());
-                println!(
-                    "shard_chunk_transactions: {}\n",
-                    serde_json::to_value(&chunk.transactions).unwrap()
-                );
-                println!(
-                    "shard_chunk_transactions: {:?}\n",
-                    cbor::to_vec(&chunk.transactions).unwrap()
-                );
-
-                println!("shard_chunk_receipts#: {}\n", chunk.receipts.len());
-                println!(
-                    "shard_chunk_receipts: {}\n",
-                    serde_json::to_value(&chunk.receipts).unwrap()
-                );
-                println!(
-                    "shard_chunk_receipts: {:?}\n",
-                    cbor::to_vec(&chunk.receipts).unwrap()
-                );
-            } else {
-                println!("shard_chunk_header: None\n");
-
-                println!("shard_chunk_transactions#: None\n");
-                println!("shard_chunk_transactions: None\n");
-
-                println!("shard_chunk_receipts#: None\n");
-                println!("shard_chunk_receipts: None\n");
-            };
-
+        if let Some(VerbosityLevel::WithStreamerMessageDump)
+        | Some(VerbosityLevel::WithStreamerMessageParse) = verbosity_level
+        {
             println!(
-                "shard_receipt_execution_outcomes#: {}\n",
-                shard.receipt_execution_outcomes.len()
+                "streamer_message: {}\n",
+                serde_json::to_string_pretty(&streamer_message).unwrap()
             );
             println!(
-                "shard_receipt_execution_outcomes: {}\n",
-                serde_json::to_value(&shard.receipt_execution_outcomes).unwrap()
+                "streamer_message: {}\n",
+                serde_json::to_string(&streamer_message).unwrap()
+            );
+        };
+
+        if let Some(VerbosityLevel::WithStreamerMessageParse) = verbosity_level {
+            println!(
+                "streamer_message: {}\n",
+                serde_json::to_value(&streamer_message).unwrap()
             );
             println!(
-                "shard_receipt_execution_outcomes: {:?}\n",
-                cbor::to_vec(&shard.receipt_execution_outcomes).unwrap()
+                "streamer_message: {:?}\n",
+                cbor::to_vec(&streamer_message).unwrap()
             );
-        });
 
-        println!("StateChanges#: {}\n", streamer_message.state_changes.len());
-        streamer_message
-            .state_changes
-            .iter()
-            .for_each(|state_change| {
+            println!(
+                "block_header: {}\n",
+                serde_json::to_value(&streamer_message.block.header).unwrap()
+            );
+            println!(
+                "block_header: {:?}\n",
+                cbor::to_vec(&streamer_message.block.header).unwrap()
+            );
+
+            println!(
+                "block_header_chunks#: {}\n",
+                streamer_message.block.chunks.len()
+            );
+            streamer_message.block.chunks.iter().for_each(|chunk| {
                 println!(
-                    "StateChange: {}\n",
-                    serde_json::to_value(&state_change).unwrap()
+                    "block_header_chunk: {}\n",
+                    serde_json::to_value(&chunk).unwrap()
                 );
-                println!("StateChange: {:?}\n", cbor::to_vec(&state_change).unwrap());
+                println!("block_header_chunk: {:?}\n", cbor::to_vec(&chunk).unwrap());
             });
-    };
+
+            println!("shards#: {}\n", streamer_message.shards.len());
+            streamer_message.shards.iter().for_each(|shard| {
+                if let Some(chunk) = &shard.chunk {
+                    println!(
+                        "shard_chunk_header: {}\n",
+                        serde_json::to_value(&chunk.header).unwrap()
+                    );
+                    println!(
+                        "shard_chunk_header: {:?}\n",
+                        cbor::to_vec(&chunk.header).unwrap()
+                    );
+
+                    println!("shard_chunk_transactions#: {}\n", chunk.transactions.len());
+                    println!(
+                        "shard_chunk_transactions: {}\n",
+                        serde_json::to_value(&chunk.transactions).unwrap()
+                    );
+                    println!(
+                        "shard_chunk_transactions: {:?}\n",
+                        cbor::to_vec(&chunk.transactions).unwrap()
+                    );
+
+                    println!("shard_chunk_receipts#: {}\n", chunk.receipts.len());
+                    println!(
+                        "shard_chunk_receipts: {}\n",
+                        serde_json::to_value(&chunk.receipts).unwrap()
+                    );
+                    println!(
+                        "shard_chunk_receipts: {:?}\n",
+                        cbor::to_vec(&chunk.receipts).unwrap()
+                    );
+                } else {
+                    println!("shard_chunk_header: None\n");
+
+                    println!("shard_chunk_transactions#: None\n");
+                    println!("shard_chunk_transactions: None\n");
+
+                    println!("shard_chunk_receipts#: None\n");
+                    println!("shard_chunk_receipts: None\n");
+                };
+
+                println!(
+                    "shard_receipt_execution_outcomes#: {}\n",
+                    shard.receipt_execution_outcomes.len()
+                );
+                println!(
+                    "shard_receipt_execution_outcomes: {}\n",
+                    serde_json::to_value(&shard.receipt_execution_outcomes).unwrap()
+                );
+                println!(
+                    "shard_receipt_execution_outcomes: {:?}\n",
+                    cbor::to_vec(&shard.receipt_execution_outcomes).unwrap()
+                );
+            });
+
+            println!("StateChanges#: {}\n", streamer_message.state_changes.len());
+            streamer_message
+                .state_changes
+                .iter()
+                .for_each(|state_change| {
+                    println!(
+                        "StateChange: {}\n",
+                        serde_json::to_value(&state_change).unwrap()
+                    );
+                    println!("StateChange: {:?}\n", cbor::to_vec(&state_change).unwrap());
+                });
+        };
+    }
 }

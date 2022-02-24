@@ -2397,7 +2397,7 @@ dependencies = [
 [[package]]
 name = "near-indexer"
 version = "0.0.0"
-source = "git+ssh://git@github.com/aurora-is-near/borealis-indexer.git?rev=71c6bfe24d2da4e2c54878e83c2b2d5571b4efcd#71c6bfe24d2da4e2c54878e83c2b2d5571b4efcd"
+source = "git+ssh://git@github.com/aurora-is-near/borealis-indexer.git?rev=aa0102055c5c616c787d61c9adf74aefd7a08a66#aa0102055c5c616c787d61c9adf74aefd7a08a66"
 dependencies = [
  "actix",
  "anyhow",
