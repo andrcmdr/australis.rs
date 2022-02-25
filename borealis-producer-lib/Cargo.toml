@@ -15,7 +15,7 @@ publish = false
 crate-type = ["rlib"]
 
 [dependencies]
-near-indexer = { git = "ssh://git@github.com/aurora-is-near/borealis-indexer.git", rev = "aa0102055c5c616c787d61c9adf74aefd7a08a66" }
+near-indexer = { git = "ssh://git@github.com/aurora-is-near/borealis-indexer.git", rev = "9b27560ed2d403d08de6591df35e1d902b939d2b" }
 borealis-types = { path = "../borealis-types" }
 nats = "0.16.0"
 
