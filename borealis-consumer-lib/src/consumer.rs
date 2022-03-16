@@ -7,8 +7,7 @@ use nats::jetstream::{
     DeliverPolicy, DiscardPolicy, ReplayPolicy, RetentionPolicy, StorageType, StreamConfig,
     StreamInfo,
 };
-// use near_indexer::StreamerMessage;
-use borealis_types::prelude::{BorealisMessage, StreamerMessage};
+use borealis_types::types::{BorealisMessage, StreamerMessage};
 use serde::de::DeserializeOwned;
 use serde_cbor as cbor;
 use serde_json;
@@ -971,19 +970,19 @@ pub trait Consumer {
                     "shard_receipt_execution_outcomes: {:?}\n",
                     cbor::to_vec(&shard.receipt_execution_outcomes).unwrap()
                 );
-            });
 
-            println!("StateChanges#: {}\n", streamer_message.state_changes.len());
-            streamer_message
-                .state_changes
-                .iter()
-                .for_each(|state_change| {
-                    println!(
-                        "StateChange: {}\n",
-                        serde_json::to_value(&state_change).unwrap()
-                    );
-                    println!("StateChange: {:?}\n", cbor::to_vec(&state_change).unwrap());
-                });
+                println!("StateChanges#: {}\n", shard.state_changes.len());
+                shard
+                    .state_changes
+                    .iter()
+                    .for_each(|state_change| {
+                        println!(
+                            "StateChange: {}\n",
+                            serde_json::to_value(&state_change).unwrap()
+                        );
+                        println!("StateChange: {:?}\n", cbor::to_vec(&state_change).unwrap());
+                    });
+            });
         };
     }
 }

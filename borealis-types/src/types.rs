@@ -260,18 +260,19 @@ where
     }
 }
 
+/// Resulting struct represents block with chunks
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StreamerMessage {
     pub block: views::BlockView,
     pub shards: Vec<IndexerShard>,
-    pub state_changes: views::StateChangesView,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct IndexerShard {
     pub shard_id: types::ShardId,
     pub chunk: Option<IndexerChunkView>,
     pub receipt_execution_outcomes: Vec<IndexerExecutionOutcomeWithReceipt>,
+    pub state_changes: views::StateChangesView,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

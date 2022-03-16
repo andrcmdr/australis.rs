@@ -1,6 +1,6 @@
 use actix;
 use anyhow::Result;
-use borealis_types::prelude::BorealisMessage;
+use borealis_types::types::{BorealisMessage, StreamerMessage};
 use futures::StreamExt;
 use nats;
 use near_indexer;
@@ -400,7 +400,7 @@ where
     fn message_dump(
         &self,
         verbosity_level: Option<VerbosityLevel>,
-        streamer_message: near_indexer::StreamerMessage,
+        streamer_message: StreamerMessage,
     ) {
         // Data handling from `StreamerMessage` data structure. For custom filtering purposes.
         // Same as: jq '{block_height: .block.header.height, block_hash: .block.header.hash, block_header_chunk: .block.chunks[0], shard_chunk_header: .shards[0].chunk.header, transactions: .shards[0].chunk.transactions, receipts: .shards[0].chunk.receipts, receipt_execution_outcomes: .shards[0].receipt_execution_outcomes, state_changes: .state_changes}'
@@ -516,19 +516,19 @@ where
                     "shard_receipt_execution_outcomes: {:?}\n",
                     cbor::to_vec(&shard.receipt_execution_outcomes).unwrap()
                 );
-            });
 
-            println!("StateChanges#: {}\n", streamer_message.state_changes.len());
-            streamer_message
-                .state_changes
-                .iter()
-                .for_each(|state_change| {
-                    println!(
-                        "StateChange: {}\n",
-                        serde_json::to_value(&state_change).unwrap()
-                    );
-                    println!("StateChange: {:?}\n", cbor::to_vec(&state_change).unwrap());
-                });
+                println!("StateChanges#: {}\n", shard.state_changes.len());
+                shard
+                    .state_changes
+                    .iter()
+                    .for_each(|state_change| {
+                        println!(
+                            "StateChange: {}\n",
+                            serde_json::to_value(&state_change).unwrap()
+                        );
+                        println!("StateChange: {:?}\n", cbor::to_vec(&state_change).unwrap());
+                    });
+            });
         };
     }
 }
