@@ -51,7 +51,10 @@ const PROBLEMATIC_BLOKS: [CryptoHash; 2] = [
 /// confirm the raw values are correct.
 #[test]
 fn test_problematic_blocks_hash() {
-    let got: Vec<String> = PROBLEMATIC_BLOKS.iter().map(std::string::ToString::to_string).collect();
+    let got: Vec<String> = PROBLEMATIC_BLOKS
+        .iter()
+        .map(std::string::ToString::to_string)
+        .collect();
     assert_eq!(
         vec![
             "ErdT2vLmiMjkRoSUfgowFYXvhGaLJZUWrgimHRkousrK",
@@ -72,8 +75,9 @@ async fn build_streamer_message(
     let chunks = fetch_block_chunks(&client, &block).await?;
 
     let protocol_config_view = fetch_protocol_config(&client, block.header.hash).await?;
-    let num_shards = protocol_config_view.num_block_producer_seats_per_shard.len()
-        as near_primitives::types::NumShards;
+    let num_shards = protocol_config_view
+        .num_block_producer_seats_per_shard
+        .len() as near_primitives::types::NumShards;
 
     let mut shards_outcomes = fetch_outcomes(&client, block.header.hash).await?;
     let mut state_changes = fetch_state_changes(
@@ -92,8 +96,12 @@ async fn build_streamer_message(
         .collect::<Vec<_>>();
 
     for chunk in chunks {
-        let views::ChunkView { transactions, author, header, receipts: chunk_non_local_receipts } =
-            chunk;
+        let views::ChunkView {
+            transactions,
+            author,
+            header,
+            receipts: chunk_non_local_receipts,
+        } = chunk;
 
         let shard_id = header.shard_id.clone() as usize;
 
@@ -102,7 +110,21 @@ async fn build_streamer_message(
             .expect("Execution outcomes for given shard should be present");
 
         // Take execution outcomes for receipts from the vec and keep only the ones for transactions
-        let mut receipt_outcomes = outcomes.split_off(transactions.len());
+        // Fixed logic issue with `split_off()` method applied for empty Outcomes vector,
+        // which 'cause a run-time allocator panic, when attempt to allocate a new vector with remained Outcomes,
+        // but Outcomes are actually empty - split should be applied for non-empty Outcomes vector only,
+        // and Outcomes should be split at amount of transactions less or equal to Outcomes quantity,
+        // remained Outcomes should be returned as a new vector,
+        // original vector will consist of Outcomes corresponding to transactions.
+        // If there are no transactions it should return all Outcomes (which may be empty as well).
+        // Otherwise when there are more transactions than Outcomes it should return all Outcomes as well.
+        let mut receipt_outcomes = {
+            if transactions.len() <= outcomes.len() {
+                outcomes.split_off(transactions.len())
+            } else {
+                outcomes.to_owned()
+            }
+        };
 
         let indexer_transactions = transactions
             .into_iter()
@@ -112,7 +134,10 @@ async fn build_streamer_message(
                     outcome.execution_outcome.id, transaction.hash,
                     "This ExecutionOutcome must have the same id as Transaction hash"
                 );
-                IndexerTransactionWithOutcome { outcome, transaction }
+                IndexerTransactionWithOutcome {
+                    outcome,
+                    transaction,
+                }
             })
             .collect::<Vec<IndexerTransactionWithOutcome>>();
 
@@ -142,7 +167,10 @@ async fn build_streamer_message(
 
         let mut receipt_execution_outcomes: Vec<IndexerExecutionOutcomeWithReceipt> = vec![];
         for outcome in receipt_outcomes {
-            let IndexerExecutionOutcomeWithOptionalReceipt { execution_outcome, receipt } = outcome;
+            let IndexerExecutionOutcomeWithOptionalReceipt {
+                execution_outcome,
+                receipt,
+            } = outcome;
             let receipt = if let Some(receipt) = receipt {
                 receipt
             } else {
@@ -176,8 +204,10 @@ async fn build_streamer_message(
                     prev_block_tried += 1;
                 }
             };
-            receipt_execution_outcomes
-                .push(IndexerExecutionOutcomeWithReceipt { execution_outcome, receipt: receipt });
+            receipt_execution_outcomes.push(IndexerExecutionOutcomeWithReceipt {
+                execution_outcome,
+                receipt: receipt,
+            });
         }
 
         // Blocks #47317863 and #47317864
@@ -193,9 +223,15 @@ async fn build_streamer_message(
         {
             let mut restored_receipts: Vec<views::ReceiptView> = vec![];
             let receipt_ids_included: std::collections::HashSet<CryptoHash> =
-                chunk_non_local_receipts.iter().map(|receipt| receipt.receipt_id).collect();
+                chunk_non_local_receipts
+                    .iter()
+                    .map(|receipt| receipt.receipt_id)
+                    .collect();
             for outcome in &receipt_execution_outcomes {
-                if receipt_ids_included.get(&outcome.receipt.receipt_id).is_none() {
+                if receipt_ids_included
+                    .get(&outcome.receipt.receipt_id)
+                    .is_none()
+                {
                     restored_receipts.push(outcome.receipt.clone());
                 }
             }
@@ -219,15 +255,22 @@ async fn build_streamer_message(
     // chunks and we end up with non-empty `shards_outcomes` we want to be sure we put them into IndexerShard
     // That might happen before the fix https://github.com/near/nearcore/pull/4228
     for (shard_id, outcomes) in shards_outcomes {
-        indexer_shards[shard_id as usize].receipt_execution_outcomes.extend(
-            outcomes.into_iter().map(|outcome| IndexerExecutionOutcomeWithReceipt {
-                execution_outcome: outcome.execution_outcome,
-                receipt: outcome.receipt.expect("`receipt` must be present at this moment"),
-            }),
-        )
+        indexer_shards[shard_id as usize]
+            .receipt_execution_outcomes
+            .extend(outcomes.into_iter().map(|outcome| {
+                IndexerExecutionOutcomeWithReceipt {
+                    execution_outcome: outcome.execution_outcome,
+                    receipt: outcome
+                        .receipt
+                        .expect("`receipt` must be present at this moment"),
+                }
+            }))
     }
 
-    Ok(StreamerMessage { block, shards: indexer_shards })
+    Ok(StreamerMessage {
+        block,
+        shards: indexer_shards,
+    })
 }
 
 /// Function that tries to find specific local receipt by it's ID and returns it
@@ -243,14 +286,20 @@ async fn find_local_receipt_by_id_in_block(
     let mut shards_outcomes = fetch_outcomes(&client, block.header.hash).await?;
 
     for chunk in chunks {
-        let views::ChunkView { header, transactions, .. } = chunk;
+        let views::ChunkView {
+            header,
+            transactions,
+            ..
+        } = chunk;
 
         let outcomes = shards_outcomes
             .remove(&header.shard_id)
             .expect("Execution outcomes for given shard should be present");
 
-        if let Some((transaction, outcome)) =
-            transactions.into_iter().zip(outcomes.into_iter()).find(|(_, outcome)| {
+        if let Some((transaction, outcome)) = transactions
+            .into_iter()
+            .zip(outcomes.into_iter())
+            .find(|(_, outcome)| {
                 outcome
                     .execution_outcome
                     .outcome
@@ -260,7 +309,10 @@ async fn find_local_receipt_by_id_in_block(
                     == &receipt_id
             })
         {
-            let indexer_transaction = IndexerTransactionWithOutcome { transaction, outcome };
+            let indexer_transaction = IndexerTransactionWithOutcome {
+                transaction,
+                outcome,
+            };
             let local_receipts = convert_transactions_sir_into_local_receipts(
                 &client,
                 &protocol_config_view,
@@ -361,7 +413,8 @@ pub(crate) async fn start(
                     }
                 }
             }
-            db.put(b"last_synced_block_height", &block_height.to_string()).unwrap();
+            db.put(b"last_synced_block_height", &block_height.to_string())
+                .unwrap();
             last_synced_block_height = Some(block_height);
         }
     }

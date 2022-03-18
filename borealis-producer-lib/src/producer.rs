@@ -390,7 +390,9 @@ where
         streamer_message: near_indexer::StreamerMessage,
         nats_connection: &nats::Connection,
     ) -> anyhow::Result<()> {
-        let message = self.context().message_encode(streamer_message.block.header.height, &streamer_message);
+        let message = self
+            .context()
+            .message_encode(streamer_message.block.header.height, &streamer_message);
         self.context().message_publish(nats_connection, &message);
         // self.message_dump(Some(VerbosityLevel::WithBlockHashHeight), streamer_message);
         Ok(())
@@ -518,16 +520,13 @@ where
                 );
 
                 println!("StateChanges#: {}\n", shard.state_changes.len());
-                shard
-                    .state_changes
-                    .iter()
-                    .for_each(|state_change| {
-                        println!(
-                            "StateChange: {}\n",
-                            serde_json::to_value(&state_change).unwrap()
-                        );
-                        println!("StateChange: {:?}\n", cbor::to_vec(&state_change).unwrap());
-                    });
+                shard.state_changes.iter().for_each(|state_change| {
+                    println!(
+                        "StateChange: {}\n",
+                        serde_json::to_value(&state_change).unwrap()
+                    );
+                    println!("StateChange: {:?}\n", cbor::to_vec(&state_change).unwrap());
+                });
             });
         };
     }

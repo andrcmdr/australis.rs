@@ -1,13 +1,13 @@
 use actix;
 use chrono::{DateTime as ChronoDateTime, Utc};
 // use chrono::TimeZone;
+use borealis_types::types::{BorealisMessage, StreamerMessage};
 use nats;
 use nats::jetstream::{
     AccountInfo, AckPolicy, Consumer as JetStreamConsumer, ConsumerConfig, ConsumerInfo, DateTime,
     DeliverPolicy, DiscardPolicy, ReplayPolicy, RetentionPolicy, StorageType, StreamConfig,
     StreamInfo,
 };
-use borealis_types::types::{BorealisMessage, StreamerMessage};
 use serde::de::DeserializeOwned;
 use serde_cbor as cbor;
 use serde_json;
@@ -159,7 +159,7 @@ impl Consumer for Context {
 
     /// client certificate
     fn client_cert_path(&self) -> Option<std::path::PathBuf> {
-        return  self.to_owned().client_cert_path;
+        return self.to_owned().client_cert_path;
     }
 
     /// client private key
@@ -274,7 +274,9 @@ pub trait Consumer {
                     .disconnect_callback(
                         || info!(target: "borealis_consumer", "connection has been lost"),
                     ) // todo: re-run message consumer
-                    .close_callback(|| info!(target: "borealis_consumer", "connection has been closed"))
+                    .close_callback(
+                        || info!(target: "borealis_consumer", "connection has been closed"),
+                    )
                 // todo: re-run message consumer
             }
             (Some(root_cert_path), Some(client_cert_path), Some(client_private_key)) => {
@@ -312,7 +314,9 @@ pub trait Consumer {
                     .disconnect_callback(
                         || info!(target: "borealis_consumer", "connection has been lost"),
                     ) // todo: re-run message consumer
-                    .close_callback(|| info!(target: "borealis_consumer", "connection has been closed"))
+                    .close_callback(
+                        || info!(target: "borealis_consumer", "connection has been closed"),
+                    )
                 // todo: re-run message consumer
             }
             _ => {
@@ -347,7 +351,9 @@ pub trait Consumer {
                     .disconnect_callback(
                         || info!(target: "borealis_consumer", "connection has been lost"),
                     ) // todo: re-run message consumer
-                    .close_callback(|| info!(target: "borealis_consumer", "connection has been closed"))
+                    .close_callback(
+                        || info!(target: "borealis_consumer", "connection has been closed"),
+                    )
                 // todo: re-run message consumer
             }
         };
@@ -764,8 +770,7 @@ pub trait Consumer {
                         target: "borealis_consumer",
                         "Message consumer loop started: listening for new messages\n"
                     );
-                    if let Ok(msg) = subscription.next_timeout(timeout)
-                    {
+                    if let Ok(msg) = subscription.next_timeout(timeout) {
                         info!(target: "borealis_consumer", "Received message:\n{}", &msg);
                         self.handle_message(msg);
                     } else {
@@ -840,10 +845,7 @@ pub trait Consumer {
     }
 
     /// Decode received NATS message from CBOR (of JSON)
-    fn message_decode<T: DeserializeOwned>(
-        &self,
-        msg: nats::Message,
-    ) -> BorealisMessage<T> {
+    fn message_decode<T: DeserializeOwned>(&self, msg: nats::Message) -> BorealisMessage<T> {
         // Decoding of Borealis Message receved from NATS subject/jetstream
         let borealis_message: BorealisMessage<T> = match self.msg_format() {
             MsgFormat::Cbor => BorealisMessage::from_cbor(msg.data.as_ref())
@@ -855,7 +857,11 @@ pub trait Consumer {
     }
 
     /// Dump information from `StreamerMessage` payload, extracted from received NATS message
-    fn message_dump(&self, verbosity_level: Option<VerbosityLevel>, streamer_message: StreamerMessage) {
+    fn message_dump(
+        &self,
+        verbosity_level: Option<VerbosityLevel>,
+        streamer_message: StreamerMessage,
+    ) {
         // Data handling from `StreamerMessage` data structure. For custom filtering purposes.
         // Same as: jq '{block_height: .block.header.height, block_hash: .block.header.hash, block_header_chunk: .block.chunks[0], shard_chunk_header: .shards[0].chunk.header, transactions: .shards[0].chunk.transactions, receipts: .shards[0].chunk.receipts, receipt_execution_outcomes: .shards[0].receipt_execution_outcomes, state_changes: .state_changes}'
 
@@ -972,16 +978,13 @@ pub trait Consumer {
                 );
 
                 println!("StateChanges#: {}\n", shard.state_changes.len());
-                shard
-                    .state_changes
-                    .iter()
-                    .for_each(|state_change| {
-                        println!(
-                            "StateChange: {}\n",
-                            serde_json::to_value(&state_change).unwrap()
-                        );
-                        println!("StateChange: {:?}\n", cbor::to_vec(&state_change).unwrap());
-                    });
+                shard.state_changes.iter().for_each(|state_change| {
+                    println!(
+                        "StateChange: {}\n",
+                        serde_json::to_value(&state_change).unwrap()
+                    );
+                    println!("StateChange: {:?}\n", cbor::to_vec(&state_change).unwrap());
+                });
             });
         };
     }

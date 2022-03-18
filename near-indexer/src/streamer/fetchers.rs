@@ -17,7 +17,10 @@ pub(crate) async fn fetch_status(
     client: &Addr<near_client::ClientActor>,
 ) -> Result<near_primitives::views::StatusResponse, FailedToFetchData> {
     client
-        .send(near_client::Status { is_health_check: false, detailed: false })
+        .send(near_client::Status {
+            is_health_check: false,
+            detailed: false,
+        })
         .await?
         .map_err(|err| FailedToFetchData::String(err.to_string()))
 }
@@ -28,9 +31,11 @@ pub(crate) async fn fetch_latest_block(
     client: &Addr<near_client::ViewClientActor>,
 ) -> Result<views::BlockView, FailedToFetchData> {
     client
-        .send(near_client::GetBlock(near_primitives::types::BlockReference::Finality(
-            near_primitives::types::Finality::Final,
-        )))
+        .send(near_client::GetBlock(
+            near_primitives::types::BlockReference::Finality(
+                near_primitives::types::Finality::Final,
+            ),
+        ))
         .await?
         .map_err(|err| FailedToFetchData::String(err.to_string()))
 }
@@ -41,7 +46,9 @@ pub(crate) async fn fetch_block_by_height(
     height: u64,
 ) -> Result<views::BlockView, FailedToFetchData> {
     client
-        .send(near_client::GetBlock(near_primitives::types::BlockId::Height(height).into()))
+        .send(near_client::GetBlock(
+            near_primitives::types::BlockId::Height(height).into(),
+        ))
         .await?
         .map_err(|err| FailedToFetchData::String(err.to_string()))
 }
@@ -52,7 +59,9 @@ pub(crate) async fn fetch_block_by_hash(
     hash: CryptoHash,
 ) -> Result<views::BlockView, FailedToFetchData> {
     client
-        .send(near_client::GetBlock(near_primitives::types::BlockId::Hash(hash).into()))
+        .send(near_client::GetBlock(
+            near_primitives::types::BlockId::Hash(hash).into(),
+        ))
         .await?
         .map_err(|err| FailedToFetchData::String(err.to_string()))
 }
@@ -63,7 +72,12 @@ pub(crate) async fn fetch_state_changes(
     epoch_id: near_primitives::types::EpochId,
 ) -> Result<HashMap<near_primitives::types::ShardId, views::StateChangesView>, FailedToFetchData> {
     client
-        .send(near_client::GetStateChangesWithCauseInBlockForTrackedShards { block_hash, epoch_id })
+        .send(
+            near_client::GetStateChangesWithCauseInBlockForTrackedShards {
+                block_hash,
+                epoch_id,
+            },
+        )
         .await?
         .map_err(|err| FailedToFetchData::String(err.to_string()))
 }
@@ -158,9 +172,9 @@ pub(crate) async fn fetch_protocol_config(
     block_hash: near_primitives::hash::CryptoHash,
 ) -> Result<near_chain_configs::ProtocolConfigView, FailedToFetchData> {
     Ok(client
-        .send(near_client::GetProtocolConfig(types::BlockReference::from(types::BlockId::Hash(
-            block_hash,
-        ))))
+        .send(near_client::GetProtocolConfig(types::BlockReference::from(
+            types::BlockId::Hash(block_hash),
+        )))
         .await?
         .map_err(|err| FailedToFetchData::String(err.to_string()))?)
 }
