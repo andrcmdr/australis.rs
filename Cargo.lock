@@ -591,7 +591,7 @@ dependencies = [
 name = "borealis-types"
 version = "0.1.0"
 dependencies = [
- "near-primitives 0.0.0 (git+https://github.com/near/nearcore?rev=803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56)",
+ "near-primitives",
  "rand 0.8.4",
  "serde",
  "serde_cbor",
@@ -2226,15 +2226,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "near-account-id"
-version = "0.0.0"
-source = "git+https://github.com/near/nearcore?rev=803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56#803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56"
-dependencies = [
- "borsh",
- "serde",
-]
-
-[[package]]
 name = "near-cache"
 version = "0.0.0"
 source = "git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283#57362268301554563c4f800af963a1270b3d5283"
@@ -2255,10 +2246,10 @@ dependencies = [
  "lru",
  "near-chain-configs",
  "near-chain-primitives",
- "near-crypto 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-crypto",
  "near-metrics",
  "near-pool",
- "near-primitives 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-primitives",
  "near-store",
  "num-rational",
  "once_cell",
@@ -2277,8 +2268,8 @@ dependencies = [
  "anyhow",
  "chrono",
  "derive_more",
- "near-crypto 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
- "near-primitives 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-crypto",
+ "near-primitives",
  "num-rational",
  "serde",
  "serde_json",
@@ -2294,8 +2285,8 @@ source = "git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a
 dependencies = [
  "anyhow",
  "chrono",
- "near-crypto 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
- "near-primitives 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-crypto",
+ "near-primitives",
  "thiserror",
  "tracing",
 ]
@@ -2312,12 +2303,12 @@ dependencies = [
  "lru",
  "near-chain",
  "near-chunks-primitives",
- "near-crypto 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-crypto",
  "near-metrics",
  "near-network",
  "near-network-primitives",
  "near-pool",
- "near-primitives 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-primitives",
  "near-store",
  "once_cell",
  "prometheus",
@@ -2332,7 +2323,7 @@ version = "0.0.0"
 source = "git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283#57362268301554563c4f800af963a1270b3d5283"
 dependencies = [
  "near-chain-primitives",
- "near-primitives 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-primitives",
 ]
 
 [[package]]
@@ -2353,14 +2344,14 @@ dependencies = [
  "near-chain-configs",
  "near-chunks",
  "near-client-primitives",
- "near-crypto 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-crypto",
  "near-metrics",
  "near-network",
  "near-network-primitives",
  "near-performance-metrics",
  "near-performance-metrics-macros",
  "near-pool",
- "near-primitives 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-primitives",
  "near-store",
  "near-telemetry",
  "num-rational",
@@ -2386,9 +2377,9 @@ dependencies = [
  "near-chain-configs",
  "near-chain-primitives",
  "near-chunks-primitives",
- "near-crypto 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-crypto",
  "near-network-primitives",
- "near-primitives 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-primitives",
  "strum",
  "thiserror",
 ]
@@ -2407,33 +2398,7 @@ dependencies = [
  "derive_more",
  "ed25519-dalek",
  "libc",
- "near-account-id 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
- "once_cell",
- "parity-secp256k1",
- "primitive-types",
- "rand 0.7.3",
- "rand_core 0.5.1",
- "serde",
- "serde_json",
- "subtle",
- "thiserror",
-]
-
-[[package]]
-name = "near-crypto"
-version = "0.0.0"
-source = "git+https://github.com/near/nearcore?rev=803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56#803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56"
-dependencies = [
- "arrayref",
- "blake2",
- "borsh",
- "bs58",
- "c2-chacha",
- "curve25519-dalek",
- "derive_more",
- "ed25519-dalek",
- "libc",
- "near-account-id 0.0.0 (git+https://github.com/near/nearcore?rev=803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56)",
+ "near-account-id",
  "once_cell",
  "parity-secp256k1",
  "primitive-types",
@@ -2454,8 +2419,8 @@ dependencies = [
  "lru",
  "near-chain",
  "near-chain-configs",
- "near-crypto 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
- "near-primitives 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-crypto",
+ "near-primitives",
  "near-store",
  "num-rational",
  "primitive-types",
@@ -2477,8 +2442,8 @@ dependencies = [
  "futures",
  "near-chain-configs",
  "near-client",
- "near-crypto 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
- "near-primitives 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-crypto",
+ "near-primitives",
  "nearcore",
  "node-runtime",
  "rocksdb",
@@ -2506,8 +2471,8 @@ dependencies = [
  "near-metrics",
  "near-network",
  "near-network-primitives",
- "near-primitives 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
- "near-rpc-error-macro 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-primitives",
+ "near-rpc-error-macro",
  "once_cell",
  "prometheus",
  "serde",
@@ -2525,7 +2490,7 @@ dependencies = [
  "awc",
  "futures",
  "near-jsonrpc-primitives",
- "near-primitives 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-primitives",
  "serde",
  "serde_json",
  "uuid",
@@ -2539,12 +2504,12 @@ dependencies = [
  "actix",
  "near-chain-configs",
  "near-client-primitives",
- "near-crypto 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-crypto",
  "near-metrics",
  "near-network-primitives",
- "near-primitives 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
- "near-primitives-core 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
- "near-rpc-error-macro 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-primitives",
+ "near-primitives-core",
+ "near-rpc-error-macro",
  "once_cell",
  "serde",
  "serde_json",
@@ -2577,12 +2542,12 @@ dependencies = [
  "futures",
  "itertools",
  "lru",
- "near-crypto 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-crypto",
  "near-metrics",
  "near-network-primitives",
  "near-performance-metrics",
  "near-performance-metrics-macros",
- "near-primitives 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-primitives",
  "near-rate-limiter",
  "near-store",
  "once_cell",
@@ -2604,8 +2569,8 @@ dependencies = [
  "anyhow",
  "borsh",
  "chrono",
- "near-crypto 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
- "near-primitives 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-crypto",
+ "near-primitives",
  "strum",
  "tokio",
  "tracing",
@@ -2643,9 +2608,9 @@ version = "0.0.0"
 source = "git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283#57362268301554563c4f800af963a1270b3d5283"
 dependencies = [
  "borsh",
- "near-crypto 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-crypto",
  "near-metrics",
- "near-primitives 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-primitives",
  "once_cell",
  "rand 0.7.3",
 ]
@@ -2662,36 +2627,10 @@ dependencies = [
  "derive_more",
  "easy-ext",
  "hex",
- "near-crypto 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
- "near-primitives-core 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
- "near-rpc-error-macro 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
- "near-vm-errors 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
- "num-rational",
- "once_cell",
- "primitive-types",
- "rand 0.7.3",
- "reed-solomon-erasure",
- "serde",
- "serde_json",
- "smart-default",
-]
-
-[[package]]
-name = "near-primitives"
-version = "0.0.0"
-source = "git+https://github.com/near/nearcore?rev=803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56#803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56"
-dependencies = [
- "borsh",
- "byteorder",
- "bytesize",
- "chrono",
- "derive_more",
- "easy-ext",
- "hex",
- "near-crypto 0.0.0 (git+https://github.com/near/nearcore?rev=803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56)",
- "near-primitives-core 0.0.0 (git+https://github.com/near/nearcore?rev=803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56)",
- "near-rpc-error-macro 0.0.0 (git+https://github.com/near/nearcore?rev=803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56)",
- "near-vm-errors 0.0.0 (git+https://github.com/near/nearcore?rev=803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56)",
+ "near-crypto",
+ "near-primitives-core",
+ "near-rpc-error-macro",
+ "near-vm-errors",
  "num-rational",
  "once_cell",
  "primitive-types",
@@ -2711,22 +2650,7 @@ dependencies = [
  "borsh",
  "bs58",
  "derive_more",
- "near-account-id 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
- "num-rational",
- "serde",
- "sha2",
-]
-
-[[package]]
-name = "near-primitives-core"
-version = "0.0.0"
-source = "git+https://github.com/near/nearcore?rev=803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56#803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56"
-dependencies = [
- "base64 0.11.0",
- "borsh",
- "bs58",
- "derive_more",
- "near-account-id 0.0.0 (git+https://github.com/near/nearcore?rev=803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56)",
+ "near-account-id",
  "num-rational",
  "serde",
  "sha2",
@@ -2760,13 +2684,13 @@ dependencies = [
  "futures",
  "hex",
  "lazy_static",
- "near-account-id 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-account-id",
  "near-chain-configs",
  "near-client",
  "near-client-primitives",
- "near-crypto 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-crypto",
  "near-network",
- "near-primitives 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-primitives",
  "paperclip",
  "serde",
  "serde_json",
@@ -2786,31 +2710,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "near-rpc-error-core"
-version = "0.0.0"
-source = "git+https://github.com/near/nearcore?rev=803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56#803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56"
-dependencies = [
- "quote",
- "serde",
- "syn",
-]
-
-[[package]]
 name = "near-rpc-error-macro"
 version = "0.0.0"
 source = "git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283#57362268301554563c4f800af963a1270b3d5283"
 dependencies = [
- "near-rpc-error-core 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
- "serde",
- "syn",
-]
-
-[[package]]
-name = "near-rpc-error-macro"
-version = "0.0.0"
-source = "git+https://github.com/near/nearcore?rev=803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56#803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56"
-dependencies = [
- "near-rpc-error-core 0.0.0 (git+https://github.com/near/nearcore?rev=803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56)",
+ "near-rpc-error-core",
  "serde",
  "syn",
 ]
@@ -2832,8 +2736,8 @@ dependencies = [
  "elastic-array",
  "fs2",
  "lru",
- "near-crypto 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
- "near-primitives 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-crypto",
+ "near-primitives",
  "num_cpus",
  "once_cell",
  "rand 0.7.3",
@@ -2867,19 +2771,8 @@ version = "0.0.0"
 source = "git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283#57362268301554563c4f800af963a1270b3d5283"
 dependencies = [
  "borsh",
- "near-account-id 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
- "near-rpc-error-macro 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
- "serde",
-]
-
-[[package]]
-name = "near-vm-errors"
-version = "0.0.0"
-source = "git+https://github.com/near/nearcore?rev=803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56#803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56"
-dependencies = [
- "borsh",
- "near-account-id 0.0.0 (git+https://github.com/near/nearcore?rev=803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56)",
- "near-rpc-error-macro 0.0.0 (git+https://github.com/near/nearcore?rev=803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56)",
+ "near-account-id",
+ "near-rpc-error-macro",
  "serde",
 ]
 
@@ -2892,11 +2785,11 @@ dependencies = [
  "borsh",
  "bs58",
  "byteorder",
- "near-account-id 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
- "near-crypto 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
- "near-primitives 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
- "near-primitives-core 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
- "near-vm-errors 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-account-id",
+ "near-crypto",
+ "near-primitives",
+ "near-primitives-core",
+ "near-vm-errors",
  "ripemd160",
  "serde",
  "sha2",
@@ -2913,9 +2806,9 @@ dependencies = [
  "loupe",
  "memoffset",
  "near-cache",
- "near-primitives 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-primitives",
  "near-stable-hasher",
- "near-vm-errors 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-vm-errors",
  "near-vm-logic",
  "once_cell",
  "parity-wasm 0.41.0",
@@ -2962,7 +2855,7 @@ dependencies = [
  "near-chain-configs",
  "near-chunks",
  "near-client",
- "near-crypto 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-crypto",
  "near-epoch-manager",
  "near-jsonrpc",
  "near-metrics",
@@ -2970,7 +2863,7 @@ dependencies = [
  "near-network-primitives",
  "near-performance-metrics",
  "near-pool",
- "near-primitives 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-primitives",
  "near-rosetta-rpc",
  "near-store",
  "near-telemetry",
@@ -3030,11 +2923,11 @@ dependencies = [
  "byteorder",
  "hex",
  "near-chain-configs",
- "near-crypto 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-crypto",
  "near-metrics",
- "near-primitives 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-primitives",
  "near-store",
- "near-vm-errors 0.0.0 (git+https://github.com/near/nearcore?rev=57362268301554563c4f800af963a1270b3d5283)",
+ "near-vm-errors",
  "near-vm-logic",
  "near-vm-runner",
  "num-bigint",
