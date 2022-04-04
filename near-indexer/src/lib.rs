@@ -97,7 +97,8 @@ impl Indexer {
         );
 
         let near_config =
-            nearcore::config::load_config(&indexer_config.home_dir, GenesisValidationMode::Full);
+            nearcore::config::load_config(&indexer_config.home_dir, GenesisValidationMode::Full)
+                .unwrap_or_else(|e| panic!("Error loading config: {:#}", e));
 
         assert!(
             !&near_config.client_config.tracked_shards.is_empty(),
@@ -123,7 +124,8 @@ impl Indexer {
     /// Boots up `near_indexer::streamer`, so it monitors the new blocks with chunks, transactions, receipts, and execution outcomes inside.
     /// The returned stream handler should be drained and handled on the user side.
     pub fn streamer(&self) -> mpsc::Receiver<StreamerMessage> {
-        let (sender, receiver) = mpsc::channel(1000); // Increased message buffer/channel for streamer sender and receiver.
+        // Increased message buffer/channel for streamer sender and receiver.
+        let (sender, receiver) = mpsc::channel(1000);
         actix::spawn(streamer::start(
             self.view_client.clone(),
             self.client.clone(),

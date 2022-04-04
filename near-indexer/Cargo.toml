@@ -20,9 +20,9 @@ tokio = { version = "1.1", features = ["time", "sync"] }
 
 borealis-types = { path = "../borealis-types" }
 
-nearcore = { git = "https://github.com/near/nearcore", rev = "803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56" }
-near-client = { git = "https://github.com/near/nearcore", rev = "803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56" }
-near-chain-configs = { git = "https://github.com/near/nearcore", rev = "803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56" }
-near-crypto = { git = "https://github.com/near/nearcore", rev = "803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56" }
-near-primitives = { git = "https://github.com/near/nearcore", rev = "803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56" }
-node-runtime = { git = "https://github.com/near/nearcore", rev = "803dd8e988c4f50a8c950bfd9fd9ff9c186ccb56" }
+nearcore = { git = "https://github.com/near/nearcore", rev = "57362268301554563c4f800af963a1270b3d5283" }
+near-client = { git = "https://github.com/near/nearcore", rev = "57362268301554563c4f800af963a1270b3d5283" }
+near-chain-configs = { git = "https://github.com/near/nearcore", rev = "57362268301554563c4f800af963a1270b3d5283" }
+near-crypto = { git = "https://github.com/near/nearcore", rev = "57362268301554563c4f800af963a1270b3d5283" }
+near-primitives = { git = "https://github.com/near/nearcore", rev = "57362268301554563c4f800af963a1270b3d5283" }
+node-runtime = { git = "https://github.com/near/nearcore", rev = "57362268301554563c4f800af963a1270b3d5283" }
