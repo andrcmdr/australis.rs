@@ -390,28 +390,33 @@ pub(crate) async fn start(
             latest_block_height
         );
         for block_height in start_syncing_block_height..=latest_block_height {
-            if let Ok(block) = fetch_block_by_height(&view_client, block_height).await {
-                let response = build_streamer_message(&view_client, block).await;
+            match fetch_block_by_height(&view_client, block_height).await {
+                Ok(block) => {
+                    let response = build_streamer_message(&view_client, block).await;
 
-                match response {
-                    Ok(streamer_message) => {
-                        debug!(target: INDEXER, "{:#?}", &streamer_message);
-                        if blocks_sink.send(streamer_message).await.is_err() {
-                            info!(
+                    match response {
+                        Ok(streamer_message) => {
+                            debug!(target: INDEXER, "{:#?}", &streamer_message);
+                            if blocks_sink.send(streamer_message).await.is_err() {
+                                info!(
+                                    target: INDEXER,
+                                    "Unable to send StreamerMessage to listener, listener doesn't listen. terminating..."
+                                );
+                                break 'main;
+                            }
+                        }
+                        Err(err) => {
+                            debug!(
                                 target: INDEXER,
-                                "Unable to send StreamerMessage to listener, listener doesn't listen. terminating..."
+                                "Missing data, skipping block #{}...", block_height
                             );
-                            break 'main;
+                            debug!(target: INDEXER, "{:#?}", err);
                         }
                     }
-                    Err(err) => {
-                        debug!(
-                            target: INDEXER,
-                            "Missing data, skipping block #{}...", block_height
-                        );
-                        debug!(target: INDEXER, "{:#?}", err);
-                    }
-                }
+                },
+                Err(error) => {
+                    debug!(target: INDEXER, "Data is missing for the block height: #{}\nFailed to fetch data from the block-chain with error: {:?}", block_height, error);
+                },
             }
             db.put(b"last_synced_block_height", &block_height.to_string())
                 .unwrap();
