@@ -15,7 +15,8 @@ log/
 */betanet*/genesis.json
 
 # NATS Creds
-# *.creds
+borealis*.creds
+nats-ext.creds
 
 # Visual Studio Code
 .vscode/
