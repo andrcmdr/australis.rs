@@ -16,7 +16,7 @@ pub use borealis_types::types::{
 
 mod streamer;
 
-pub const INDEXER: &str = "indexer";
+pub const INDEXER: &str = "near_indexer";
 
 /// Config wrapper to simplify signature and usage of `nearcore::init_configs`
 /// function by making args more explicit via struct
@@ -125,7 +125,7 @@ impl Indexer {
     /// The returned stream handler should be drained and handled on the user side.
     pub fn streamer(&self) -> mpsc::Receiver<StreamerMessage> {
         // Increased message buffer/channel for streamer sender and receiver.
-        let (sender, receiver) = mpsc::channel(1000);
+        let (sender, receiver) = mpsc::channel(86400);
         actix::spawn(streamer::start(
             self.view_client.clone(),
             self.client.clone(),
