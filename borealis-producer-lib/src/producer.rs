@@ -238,14 +238,31 @@ impl From<InitConfigArgs> for near_indexer::InitConfigArgs {
 
 /// Initialize logging
 pub fn init_logging() {
-    // Custom filters
-    let env_filter = EnvFilter::new(
-        "borealis-indexer=info,tokio_reactor=info,near=info,near=error,stats=info,telemetry=info,borealis_indexer=info,indexer=info,near-performance-metrics=info",
+
+    // Filters can be customized through RUST_LOG environment variable via CLI
+    let mut env_filter = EnvFilter::new(
+        "tokio_reactor=info,near=info,near=error,stats=info,telemetry=info,near-performance-metrics=info,aggregated=info,near_indexer=info,borealis_indexer=info",
     );
+
+    if let Ok(rust_log) = std::env::var("RUST_LOG") {
+        if !rust_log.is_empty() {
+            for directive in rust_log.split(',').filter_map(|s| match s.parse() {
+                Ok(directive) => Some(directive),
+                Err(err) => {
+                    eprintln!("Ignoring directive `{}`: {}", s, err);
+                    None
+                }
+            }) {
+                env_filter = env_filter.add_directive(directive);
+            }
+        }
+    }
+
     tracing_subscriber::fmt::Subscriber::builder()
         .with_env_filter(env_filter)
         .with_writer(std::io::stdout)
         .init();
+
 }
 
 /// Composite type for Borealis Indexer's configurations initialization
