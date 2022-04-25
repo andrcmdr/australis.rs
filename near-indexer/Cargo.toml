@@ -21,19 +21,19 @@ tokio = { version = "1.18.0", features = ["time", "sync"] }
 
 borealis-types = { path = "../borealis-types" }
 
-nearcore = { git = "https://github.com/near/nearcore", branch = "master" }
-near-client = { git = "https://github.com/near/nearcore", branch = "master" }
-near-chain-configs = { git = "https://github.com/near/nearcore", branch = "master" }
-near-crypto = { git = "https://github.com/near/nearcore", branch = "master" }
-near-primitives = { git = "https://github.com/near/nearcore", branch = "master" }
-node-runtime = { git = "https://github.com/near/nearcore", branch = "master" }
+nearcore = { git = "https://github.com/near/nearcore", rev = "d92234c2f915465ab7319768044cd6edee576a31" }
+near-client = { git = "https://github.com/near/nearcore", rev = "d92234c2f915465ab7319768044cd6edee576a31" }
+near-chain-configs = { git = "https://github.com/near/nearcore", rev = "d92234c2f915465ab7319768044cd6edee576a31" }
+near-crypto = { git = "https://github.com/near/nearcore", rev = "d92234c2f915465ab7319768044cd6edee576a31" }
+near-primitives = { git = "https://github.com/near/nearcore", rev = "d92234c2f915465ab7319768044cd6edee576a31" }
+node-runtime = { git = "https://github.com/near/nearcore", rev = "d92234c2f915465ab7319768044cd6edee576a31" }
 
-# nearcore = { git = "https://github.com/near/nearcore", rev = "5ed44bf6637b73e67023bc4e2b44cedff3657781" }
-# near-client = { git = "https://github.com/near/nearcore", rev = "5ed44bf6637b73e67023bc4e2b44cedff3657781" }
-# near-chain-configs = { git = "https://github.com/near/nearcore", rev = "5ed44bf6637b73e67023bc4e2b44cedff3657781" }
-# near-crypto = { git = "https://github.com/near/nearcore", rev = "5ed44bf6637b73e67023bc4e2b44cedff3657781" }
-# near-primitives = { git = "https://github.com/near/nearcore", rev = "5ed44bf6637b73e67023bc4e2b44cedff3657781" }
-# node-runtime = { git = "https://github.com/near/nearcore", rev = "5ed44bf6637b73e67023bc4e2b44cedff3657781" }
+# nearcore = { git = "https://github.com/near/nearcore", branch = "master" }
+# near-client = { git = "https://github.com/near/nearcore", branch = "master" }
+# near-chain-configs = { git = "https://github.com/near/nearcore", branch = "master" }
+# near-crypto = { git = "https://github.com/near/nearcore", branch = "master" }
+# near-primitives = { git = "https://github.com/near/nearcore", branch = "master" }
+# node-runtime = { git = "https://github.com/near/nearcore", branch = "master" }
 
 # nearcore = { git = "https://github.com/near/nearcore", tag = "1.26.0-rc.2" }
 # near-client = { git = "https://github.com/near/nearcore", tag = "1.26.0-rc.2" }
@@ -41,3 +41,10 @@ node-runtime = { git = "https://github.com/near/nearcore", branch = "master" }
 # near-crypto = { git = "https://github.com/near/nearcore", tag = "1.26.0-rc.2" }
 # near-primitives = { git = "https://github.com/near/nearcore", tag = "1.26.0-rc.2" }
 # node-runtime = { git = "https://github.com/near/nearcore", tag = "1.26.0-rc.2" }
+
+# nearcore = { git = "https://github.com/near/nearcore", rev = "5ed44bf6637b73e67023bc4e2b44cedff3657781" }
+# near-client = { git = "https://github.com/near/nearcore", rev = "5ed44bf6637b73e67023bc4e2b44cedff3657781" }
+# near-chain-configs = { git = "https://github.com/near/nearcore", rev = "5ed44bf6637b73e67023bc4e2b44cedff3657781" }
+# near-crypto = { git = "https://github.com/near/nearcore", rev = "5ed44bf6637b73e67023bc4e2b44cedff3657781" }
+# near-primitives = { git = "https://github.com/near/nearcore", rev = "5ed44bf6637b73e67023bc4e2b44cedff3657781" }
+# node-runtime = { git = "https://github.com/near/nearcore", rev = "5ed44bf6637b73e67023bc4e2b44cedff3657781" }
