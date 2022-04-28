@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "borealis-producer-lib",
+    "borealis-indexer-lib",
     "borealis-consumer-lib",
     "borealis-types",
     "near-indexer",

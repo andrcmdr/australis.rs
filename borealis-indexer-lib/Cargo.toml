@@ -1,10 +1,10 @@
 [package]
-name = "borealis-producer-lib"
+name = "borealis-indexer-lib"
 version = "0.9.0"
 authors = ["Aurora <hello@aurora.dev>"]
 edition = "2021"
 # rust-version = "1.60.0"
-description = "Borealis Producer's Library for creating NATS producers for Borealis Bus, NATS based service-oriented bus (MOM/MQ)."
+description = "Borealis Indexer's Library for creating NEAR indexers and archival nodes."
 homepage = "https://github.com/aurora-is-near/borealis.rs"
 repository = "https://github.com/aurora-is-near/borealis.rs"
 license-file = "LICENSE"
