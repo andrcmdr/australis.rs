@@ -552,7 +552,7 @@ dependencies = [
 
 [[package]]
 name = "borealis-consumer-lib"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "actix",
  "borealis-types",
@@ -569,16 +569,16 @@ dependencies = [
 
 [[package]]
 name = "borealis-indexer-lib"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "actix",
  "anyhow",
  "async-trait",
+ "borealis-producer-lib",
  "borealis-types",
  "futures",
  "nats",
  "near-indexer",
- "rand 0.8.4",
  "serde",
  "serde_cbor",
  "serde_json",
@@ -590,28 +590,19 @@ dependencies = [
 
 [[package]]
 name = "borealis-producer-lib"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
- "actix",
- "anyhow",
- "async-trait",
  "borealis-types",
- "futures",
  "nats",
- "near-indexer",
  "rand 0.8.4",
  "serde",
- "serde_cbor",
- "serde_json",
- "tokio",
- "tokio-stream",
  "tracing",
  "tracing-subscriber 0.2.25",
 ]
 
 [[package]]
 name = "borealis-types"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "lzzzz",
  "near-primitives",
@@ -2514,7 +2505,7 @@ dependencies = [
 
 [[package]]
 name = "near-indexer"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "actix",
  "anyhow",
