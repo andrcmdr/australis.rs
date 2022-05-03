@@ -18,7 +18,6 @@ borealis-types = { path = "../borealis-types" }
 nats = "0.16.0"
 chrono = "0.4.19"
 
-# actix = "0.11.0-beta.2"
 actix = "0.13.0"
 tokio = { version = "1.18.0", features = ["sync"] }
 
