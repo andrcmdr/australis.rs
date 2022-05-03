@@ -203,7 +203,7 @@ where
         let envelope_ser = self.envelope.to_cbor();
         let payload_ser = cbor::to_vec(&self.payload).expect("[CBOR bytes vector: Payload] Message serialization error");
 
-        assert_eq!(envelope_ser.len(), 30, "[CBOR vector length] CBOR vector length {} isn't 30.", payload_ser.len());
+        assert_eq!(envelope_ser.len(), 30, "[CBOR vector length] CBOR vector length {} isn't 30.", envelope_ser.len());
 
         let mut msg_ser = Vec::with_capacity(1 + envelope_ser.len() + payload_ser.len());
         msg_ser.push(self.version);
