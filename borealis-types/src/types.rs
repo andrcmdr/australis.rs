@@ -11,6 +11,8 @@ pub use near_primitives::{types, views};
 
 use std::time::SystemTime;
 
+pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
+
 pub const VERSION: u8 = 1;
 pub const EVENT_TYPE: u16 = 4096;
 pub const BOREALIS_EPOCH: u64 = 1231006505; // Conform to Bitcoin genesis, 2009-01-03T18:15:05Z
@@ -78,7 +80,7 @@ impl<T> RawEvent<T>
 where
     T: DeserializeOwned,
 {
-    pub fn from_cbor(msg: &Vec<u8>) -> Option<Self> {
+    pub fn from_cbor(msg: &[u8]) -> Option<Self> {
         if msg.len() != 0 {
             Some(
                 cbor::from_slice(msg)
@@ -89,7 +91,7 @@ where
         }
     }
 
-    pub fn from_json_bytes(msg: &Vec<u8>) -> Option<Self> {
+    pub fn from_json_bytes(msg: &[u8]) -> Option<Self> {
         if msg.len() != 0 {
             Some(
                 serde_json::from_slice(msg)
@@ -133,21 +135,21 @@ pub struct Envelope {
     pub unique_id: [u8; 16],
 }
 
-// Required this way as it isn't possible to represent a struct as an array
-// as expected by the CBOR RFC.
+/// Borealis Message header, represented as tuple structure, with anonymous unnamed fields,
+/// 'cause header/envelope in a CBOR chunk of data should be represented as an array, using serde_cbor.
+/// Required for following CBOR RFC and compatibility with CBOR decoders existed for other languages.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 struct EnvelopeArr(u16, u64, u32, u16, [u8; 16]);
 
 impl From<&Envelope> for EnvelopeArr {
     fn from(envelope: &Envelope) -> Self {
-        EnvelopeArr(envelope.event_type, envelope.sequential_id, envelope.timestamp_s, envelope.timestamp_ms, envelope.unique_id)
-    }
-}
-
-impl Envelope {
-    pub fn to_cbor(&self) -> Vec<u8> {
-        let envelope_arr: EnvelopeArr = EnvelopeArr::from(self);
-        cbor::to_vec(&envelope_arr).expect("[CBOR bytes vector: Envelope] Message serialization error")
+        EnvelopeArr(
+            envelope.event_type,
+            envelope.sequential_id,
+            envelope.timestamp_s,
+            envelope.timestamp_ms,
+            envelope.unique_id
+        )
     }
 }
 
@@ -167,6 +169,11 @@ impl Envelope {
             unique_id,
         }
     }
+
+    pub fn to_cbor(&self) -> Vec<u8> {
+        let envelope_arr: EnvelopeArr = EnvelopeArr::from(self);
+        cbor::to_vec(&envelope_arr).expect("[CBOR bytes vector: Envelope] Message serialization error")
+    }
 }
 
 /// Separately CBOR/JSON de/serialized header/envelope and body/payload data fields
@@ -177,10 +184,6 @@ pub struct BorealisMessage<T> {
     //  payload can be an object, string or JSON string for further payload serialization and deserialization with the whole RawEvent message to/from CBOR or JSON format with a byte vector representration for a message transmission
     pub payload: T,
 }
-
-// Required this way as it isn't possible to represent a struct as an array
-// as expected by the CBOR RFC.
-pub struct BorealisMessageArr<T>(u8, EnvelopeArr, T);
 
 impl<T> BorealisMessage<T> {
     pub fn new(sequential_id: u64, payload: T) -> Self {
@@ -201,16 +204,17 @@ where
 {
     pub fn to_cbor(&self) -> Vec<u8> {
         let envelope_ser = self.envelope.to_cbor();
+        assert_eq!(envelope_ser.len(), 30, "[CBOR bytes vector: Envelope] CBOR bytes vector length is {} bytes and isn't equal to required 30 bytes size for the Borealis Message Envelope header after CBOR encoding", envelope_ser.len());
+
         let payload_ser = cbor::to_vec(&self.payload).expect("[CBOR bytes vector: Payload] Message serialization error");
 
-        assert_eq!(envelope_ser.len(), 30, "[CBOR vector length] CBOR vector length {} isn't 30.", envelope_ser.len());
+        let mut message_ser = Vec::with_capacity(1 + envelope_ser.len() + payload_ser.len());
 
-        let mut msg_ser = Vec::with_capacity(1 + envelope_ser.len() + payload_ser.len());
-        msg_ser.push(self.version);
-        msg_ser.extend(envelope_ser);
-        msg_ser.extend(payload_ser);
+        message_ser.push(self.version);
+        message_ser.extend(envelope_ser);
+        message_ser.extend(payload_ser);
 
-        msg_ser
+        message_ser
     }
 
     pub fn to_json_bytes(&self) -> Vec<u8> {
@@ -239,16 +243,16 @@ where
             Some(Self {
                 version: version.to_owned(),
                 envelope: cbor::value::from_value(chunk.next().unwrap().unwrap())
-                    .expect("[CBOR bytes vector: envelope] Message deserialization error"),
+                    .expect("[CBOR bytes vector: Envelope] Message deserialization error"),
                 payload: cbor::value::from_value(chunk.next().unwrap().unwrap())
-                    .expect("[CBOR bytes vector: payload] Message deserialization error"),
+                    .expect("[CBOR bytes vector: Payload] Message deserialization error"),
             })
         } else {
             None
         }
     }
 
-    pub fn from_json_bytes(msg: &Vec<u8>) -> Option<Self> {
+    pub fn from_json_bytes(msg: &[u8]) -> Option<Self> {
         if msg.len() != 0 {
             Some(
                 serde_json::from_slice(msg)
@@ -340,6 +344,7 @@ mod tests {
             },
             payload: "hello world".to_string()
         };
+
         let cbor_out = message.to_cbor();
         let expected: Vec<u8> = vec![1, 133, 25, 11, 184, 1, 26, 98, 113, 109, 127, 25, 2, 43, 144, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 107, 104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100];
 
