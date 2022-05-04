@@ -58,21 +58,44 @@ impl<T> RawEvent<T>
 where
     T: Serialize,
 {
-    pub fn to_cbor(&self) -> Vec<u8> {
-        cbor::to_vec(&self).expect("[CBOR bytes vector: RawEvent] Message serialization error")
+    pub fn to_cbor(&self) -> Result<Vec<u8>, Error> {
+        let result = cbor::to_vec(&self);
+        match result {
+            Ok(cbor_bytes) => Ok(cbor_bytes),
+            Err(error) => {
+                Err(format!("[CBOR bytes vector: RawEvent] Message serialization error: {:?}", error).into())
+            },
+        }
     }
 
-    pub fn to_json_bytes(&self) -> Vec<u8> {
-        serde_json::to_vec(&self)
-            .expect("[JSON bytes vector: RawEvent] Message serialization error")
+    pub fn to_json_bytes(&self) -> Result<Vec<u8>, Error> {
+        let result = serde_json::to_vec(&self);
+        match result {
+            Ok(json_bytes) => Ok(json_bytes),
+            Err(error) => {
+                Err(format!("[JSON bytes vector: RawEvent] Message serialization error: {:?}", error).into())
+            },
+        }
     }
 
-    pub fn to_json_string(&self) -> String {
-        serde_json::to_string(&self).expect("[JSON string: RawEvent] Message serialization error")
+    pub fn to_json_string(&self) -> Result<String,Error> {
+        let result = serde_json::to_string(&self);
+        match result {
+            Ok(json_string) => Ok(json_string),
+            Err(error) => {
+                Err(format!("[JSON string: RawEvent] Message serialization error: {:?}", error).into())
+            },
+        }
     }
 
-    pub fn to_json_value(&self) -> Value {
-        serde_json::to_value(&self).expect("[JSON Value: RawEvent] Message serialization error")
+    pub fn to_json_value(&self) -> Result<Value, Error> {
+        let result = serde_json::to_value(&self);
+        match result {
+            Ok(json_value) => Ok(json_value),
+            Err(error) => {
+                Err(format!("[JSON Value: RawEvent] Message serialization error: {:?}", error).into())
+            },
+        }
     }
 }
 
@@ -80,47 +103,55 @@ impl<T> RawEvent<T>
 where
     T: DeserializeOwned,
 {
-    pub fn from_cbor(msg: &[u8]) -> Option<Self> {
-        if msg.len() != 0 {
-            Some(
-                cbor::from_slice(msg)
-                    .expect("[CBOR bytes vector: RawEvent] Message deserialization error"),
-            )
+    pub fn from_cbor(msg: &[u8]) -> Result<Option<Self>, Error> {
+        if !msg.is_empty() {
+            let result = cbor::from_slice::<Self>(msg);
+            match result {
+                Ok(message) => Ok(Some(message)),
+                Err(error) => {
+                    Err(format!("[CBOR bytes vector: RawEvent] Message deserialization error: {:?}", error).into())
+                },
+            }
         } else {
-            None
+            Ok(None)
         }
     }
 
-    pub fn from_json_bytes(msg: &[u8]) -> Option<Self> {
-        if msg.len() != 0 {
-            Some(
-                serde_json::from_slice(msg)
-                    .expect("[JSON bytes vector: RawEvent] Message deserialization error"),
-            )
+    pub fn from_json_bytes(msg: &[u8]) -> Result<Option<Self>, Error> {
+        if !msg.is_empty() {
+            let result = serde_json::from_slice::<Self>(msg);
+            match result {
+                Ok(message) => Ok(Some(message)),
+                Err(error) => {
+                    Err(format!("[JSON bytes vector: RawEvent] Message deserialization error: {:?}", error).into())
+                },
+            }
         } else {
-            None
+            Ok(None)
         }
     }
 
-    pub fn from_json_string(msg: &str) -> Option<Self> {
-        if msg.len() != 0 {
-            Some(
-                serde_json::from_str(msg)
-                    .expect("[JSON string: RawEvent] Message deserialization error"),
-            )
+    pub fn from_json_string(msg: &str) -> Result<Option<Self>, Error> {
+        if !msg.is_empty() {
+            let result = serde_json::from_str::<Self>(msg);
+            match result {
+                Ok(message) => Ok(Some(message)),
+                Err(error) => {
+                    Err(format!("[JSON string: RawEvent] Message deserialization error: {:?}", error).into())
+                },
+            }
         } else {
-            None
+            Ok(None)
         }
     }
 
-    pub fn from_json_value(val: Value) -> Option<Self> {
-        if let Some(value) = Some(val) {
-            Some(
-                serde_json::from_value(value)
-                    .expect("[JSON Value: RawEvent] Message deserialization error"),
-            )
-        } else {
-            None
+    pub fn from_json_value(val: Value) -> Result<Self, Error> {
+        let result = serde_json::from_value::<Self>(val);
+        match result {
+            Ok(message) => Ok(message),
+            Err(error) => {
+                Err(format!("[JSON Value: RawEvent] Message deserialization error: {:?}", error).into())
+            },
         }
     }
 }
@@ -170,9 +201,15 @@ impl Envelope {
         }
     }
 
-    pub fn to_cbor(&self) -> Vec<u8> {
+    pub fn to_cbor(&self) -> Result<Vec<u8>, Error> {
         let envelope_arr: EnvelopeArr = EnvelopeArr::from(self);
-        cbor::to_vec(&envelope_arr).expect("[CBOR bytes vector: Envelope] Message serialization error")
+        let result = cbor::to_vec(&envelope_arr);
+        match result {
+            Ok(cbor_bytes) => Ok(cbor_bytes),
+            Err(error) => {
+                Err(format!("[CBOR bytes vector: Envelope] Message header serialization error: {:?}", error).into())
+            },
+        }
     }
 }
 
@@ -202,11 +239,20 @@ impl<T> BorealisMessage<T>
 where
     T: Serialize,
 {
-    pub fn to_cbor(&self) -> Vec<u8> {
-        let envelope_ser = self.envelope.to_cbor();
-        assert_eq!(envelope_ser.len(), 30, "[CBOR bytes vector: Envelope] CBOR bytes vector length is {} bytes and isn't equal to required 30 bytes size for the Borealis Message Envelope header after CBOR encoding", envelope_ser.len());
+    pub fn to_cbor(&self) -> Result<Vec<u8>, Error> {
+        let envelope_ser = match self.envelope.to_cbor() {
+            Ok(envelope_bytes) => envelope_bytes,
+            Err(error) => {
+                return Err(format!("[CBOR bytes vector: Envelope] Message header serialization error: {:?}", error).into())
+            },
+        };
 
-        let payload_ser = cbor::to_vec(&self.payload).expect("[CBOR bytes vector: Payload] Message serialization error");
+        let payload_ser = match cbor::to_vec(&self.payload) {
+            Ok(payload_bytes) => payload_bytes,
+            Err(error) => {
+                return Err(format!("[CBOR bytes vector: Payload] Message body serialization error: {:?}", error).into())
+            },
+        };
 
         let mut message_ser = Vec::with_capacity(1 + envelope_ser.len() + payload_ser.len());
 
@@ -214,22 +260,37 @@ where
         message_ser.extend(envelope_ser);
         message_ser.extend(payload_ser);
 
-        message_ser
+        Ok(message_ser)
     }
 
-    pub fn to_json_bytes(&self) -> Vec<u8> {
-        serde_json::to_vec(&self)
-            .expect("[JSON bytes vector: BorealisMessage] Message serialization error")
+    pub fn to_json_bytes(&self) -> Result<Vec<u8>, Error> {
+        let result = serde_json::to_vec(&self);
+        match result {
+            Ok(json_bytes) => Ok(json_bytes),
+            Err(error) => {
+                Err(format!("[JSON bytes vector: BorealisMessage] Message serialization error: {:?}", error).into())
+            },
+        }
     }
 
-    pub fn to_json_string(&self) -> String {
-        serde_json::to_string(&self)
-            .expect("[JSON string: BorealisMessage] Message serialization error")
+    pub fn to_json_string(&self) -> Result<String, Error> {
+        let result = serde_json::to_string(&self);
+        match result {
+            Ok(json_string) => Ok(json_string),
+            Err(error) => {
+                Err(format!("[JSON string: BorealisMessage] Message serialization error: {:?}", error).into())
+            },
+        }
     }
 
-    pub fn to_json_value(&self) -> Value {
-        serde_json::to_value(&self)
-            .expect("[JSON Value: BorealisMessage] Message serialization error")
+    pub fn to_json_value(&self) -> Result<Value, Error> {
+        let result = serde_json::to_value(&self);
+        match result {
+            Ok(json_value) => Ok(json_value),
+            Err(error) => {
+                Err(format!("[JSON Value: BorealisMessage] Message serialization error: {:?}", error).into())
+            },
+        }
     }
 }
 
@@ -237,51 +298,93 @@ impl<T> BorealisMessage<T>
 where
     T: DeserializeOwned,
 {
-    pub fn from_cbor(msg: &[u8]) -> Option<Self> {
-        if let Some((version, message)) = msg.split_first() {
-            let mut chunk = Deserializer::from_slice(message).into_iter::<cbor::Value>();
-            Some(Self {
-                version: version.to_owned(),
-                envelope: cbor::value::from_value(chunk.next().unwrap().unwrap())
-                    .expect("[CBOR bytes vector: Envelope] Message deserialization error"),
-                payload: cbor::value::from_value(chunk.next().unwrap().unwrap())
-                    .expect("[CBOR bytes vector: Payload] Message deserialization error"),
-            })
+    pub fn from_cbor(msg: &[u8]) -> Result<Option<Self>, Error> {
+        if !msg.is_empty() {
+            if let Some((version, message)) = msg.split_first() {
+                let mut chunk = Deserializer::from_slice(message).into_iter::<cbor::Value>();
+
+                let envelope_value = match chunk.next() { 
+                    Some(Ok(envelope_value)) => envelope_value,
+                    Some(Err(error)) => {
+                        return Err(format!("[CBOR bytes vector: Envelope Value] Message header deserialization error: {:?}", error).into())
+                    },
+                    None => {
+                        return Err(format!("[CBOR bytes vector: Envelope Value] Message header deserialization error: Envelope value is empty").into())
+                    },
+                };
+
+                let payload_value = match chunk.next() {
+                    Some(Ok(payload_value)) => payload_value,
+                    Some(Err(error)) => {
+                        return Err(format!("[CBOR bytes vector: Payload Value] Message body deserialization error: {:?}", error).into())
+                    },
+                    None => {
+                        return Err(format!("[CBOR bytes vector: Payload Value] Message body deserialization error: Payload value is empty").into())
+                    },
+                };
+
+                let envelope = match cbor::value::from_value::<Envelope>(envelope_value) {
+                    Ok(envelope) => envelope,
+                    Err(error) => {
+                        return Err(format!("[CBOR bytes vector: Envelope] Message header deserialization error: {:?}", error).into())
+                    },
+                };
+
+                let payload = match cbor::value::from_value::<T>(payload_value) {
+                    Ok(payload) => payload,
+                    Err(error) => {
+                        return Err(format!("[CBOR bytes vector: Payload] Message body deserialization error: {:?}", error).into())
+                    },
+                };
+
+                Ok(Some(Self {
+                    version: version.to_owned(),
+                    envelope,
+                    payload,
+                }))
+            } else {
+                Ok(None)
+            }
         } else {
-            None
+            Ok(None)
         }
     }
 
-    pub fn from_json_bytes(msg: &[u8]) -> Option<Self> {
-        if msg.len() != 0 {
-            Some(
-                serde_json::from_slice(msg)
-                    .expect("[JSON bytes vector: BorealisMessage] Message deserialization error"),
-            )
+    pub fn from_json_bytes(msg: &[u8]) -> Result<Option<Self>, Error> {
+        if !msg.is_empty() {
+            let result = serde_json::from_slice::<Self>(msg);
+            match result {
+                Ok(message) => Ok(Some(message)),
+                Err(error) => {
+                    Err(format!("[JSON bytes vector: BorealisMessage] Message deserialization error: {:?}", error).into())
+                },
+            }
         } else {
-            None
+            Ok(None)
         }
     }
 
-    pub fn from_json_string(msg: &str) -> Option<Self> {
-        if msg.len() != 0 {
-            Some(
-                serde_json::from_str(msg)
-                    .expect("[JSON string: BorealisMessage] Message deserialization error"),
-            )
+    pub fn from_json_string(msg: &str) -> Result<Option<Self>, Error> {
+        if !msg.is_empty() {
+            let result = serde_json::from_str::<Self>(msg);
+            match result {
+                Ok(message) => Ok(Some(message)),
+                Err(error) => {
+                    Err(format!("[JSON string: BorealisMessage] Message deserialization error: {:?}", error).into())
+                },
+            }
         } else {
-            None
+            Ok(None)
         }
     }
 
-    pub fn from_json_value(val: Value) -> Option<Self> {
-        if let Some(value) = Some(val) {
-            Some(
-                serde_json::from_value(value)
-                    .expect("[JSON Value: BorealisMessage] Message deserialization error"),
-            )
-        } else {
-            None
+    pub fn from_json_value(val: Value) -> Result<Self, Error> {
+        let result  = serde_json::from_value::<Self>(val);
+        match result {
+            Ok(message) => Ok(message),
+            Err(error) => {
+                Err(format!("[JSON Value: BorealisMessage] Message deserialization error: {:?}", error).into())
+            },
         }
     }
 }
@@ -345,7 +448,7 @@ mod tests {
             payload: "hello world".to_string()
         };
 
-        let cbor_out = message.to_cbor();
+        let cbor_out = message.to_cbor().unwrap();
         let expected: Vec<u8> = vec![1, 133, 25, 11, 184, 1, 26, 98, 113, 109, 127, 25, 2, 43, 144, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 107, 104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100];
 
         assert_eq!(cbor_out, expected);
@@ -354,7 +457,7 @@ mod tests {
     #[test]
     fn test_borealis_message_deserialization() {
         let cbor_in: Vec<u8> = vec![1, 133, 25, 11, 184, 1, 26, 98, 113, 109, 127, 25, 2, 43, 144, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 107, 104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100];
-        let message: BorealisMessage<String> = BorealisMessage::from_cbor(&cbor_in).unwrap();
+        let message: BorealisMessage<String> = BorealisMessage::from_cbor(&cbor_in).unwrap().unwrap();
 
         let expected = BorealisMessage {
             version: 1,

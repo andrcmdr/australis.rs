@@ -642,7 +642,7 @@ pub trait Producer {
                     .reconnect_delay_callback(|reconnect_try| {
                         let reconnect_attempt = {
                             if reconnect_try == 0 {
-                                1 as usize
+                                1_usize
                             } else {
                                 reconnect_try
                             }
@@ -681,7 +681,7 @@ pub trait Producer {
                     .reconnect_delay_callback(|reconnect_try| {
                         let reconnect_attempt = {
                             if reconnect_try == 0 {
-                                1 as usize
+                                1_usize
                             } else {
                                 reconnect_try
                             }
@@ -717,7 +717,7 @@ pub trait Producer {
                     .reconnect_delay_callback(|reconnect_try| {
                         let reconnect_attempt = {
                             if reconnect_try == 0 {
-                                1 as usize
+                                1_usize
                             } else {
                                 reconnect_try
                             }
@@ -763,8 +763,8 @@ pub trait Producer {
     /// Create Borealis Message with payload
     fn message_encode<T: Serialize>(&self, msg_seq_id: u64, payload: &T) -> Vec<u8> {
         match self.msg_format() {
-            MsgFormat::Cbor => BorealisMessage::new(msg_seq_id, payload).to_cbor(),
-            MsgFormat::Json => BorealisMessage::new(msg_seq_id, payload).to_json_bytes(),
+            MsgFormat::Cbor => BorealisMessage::new(msg_seq_id, payload).to_cbor().unwrap(),
+            MsgFormat::Json => BorealisMessage::new(msg_seq_id, payload).to_json_bytes().unwrap(),
         }
     }
 

@@ -270,7 +270,7 @@ pub trait Consumer {
                     .reconnect_delay_callback(|reconnect_try| {
                         let reconnect_attempt = {
                             if reconnect_try == 0 {
-                                1 as usize
+                                1_usize
                             } else {
                                 reconnect_try
                             }
@@ -310,7 +310,7 @@ pub trait Consumer {
                     .reconnect_delay_callback(|reconnect_try| {
                         let reconnect_attempt = {
                             if reconnect_try == 0 {
-                                1 as usize
+                                1_usize
                             } else {
                                 reconnect_try
                             }
@@ -347,7 +347,7 @@ pub trait Consumer {
                     .reconnect_delay_callback(|reconnect_try| {
                         let reconnect_attempt = {
                             if reconnect_try == 0 {
-                                1 as usize
+                                1_usize
                             } else {
                                 reconnect_try
                             }
@@ -866,9 +866,9 @@ pub trait Consumer {
         // Decoding of Borealis Message receved from NATS subject/jetstream
         let borealis_message: BorealisMessage<T> = match self.msg_format() {
             MsgFormat::Cbor => BorealisMessage::from_cbor(msg.data.as_ref())
-                .expect("[From CBOR bytes vector: message empty] Message decoding error"),
+                .expect("[From CBOR bytes vector: message empty] Message decoding error").unwrap(),
             MsgFormat::Json => BorealisMessage::from_json_bytes(msg.data.as_ref())
-                .expect("[From JSON bytes vector: message empty] Message decoding error"),
+                .expect("[From JSON bytes vector: message empty] Message decoding error").unwrap(),
         };
         borealis_message
     }
