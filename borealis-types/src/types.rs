@@ -6,6 +6,8 @@ use serde_cbor::Deserializer;
 use serde_json;
 use serde_json::Value;
 
+use lzzzz::lz4f::{BlockSize, PreferencesBuilder, CLEVEL_MAX, compress_to_vec, decompress_to_vec};
+
 pub use near_primitives::hash::CryptoHash;
 pub use near_primitives::{types, views};
 
@@ -201,7 +203,7 @@ impl Envelope {
         }
     }
 
-    pub fn to_cbor(&self) -> Result<Vec<u8>, Error> {
+    pub fn to_cbor_arr(&self) -> Result<Vec<u8>, Error> {
         let envelope_arr: EnvelopeArr = EnvelopeArr::from(self);
         let result = cbor::to_vec(&envelope_arr);
         match result {
@@ -233,6 +235,37 @@ impl<T> BorealisMessage<T> {
             payload,
         }
     }
+
+    pub fn payload_compress(payload: &[u8]) -> Result<(Vec<u8>, usize), Error> {
+        let prefs = PreferencesBuilder::new()
+            .block_size(BlockSize::Max1MB)
+            .compression_level(CLEVEL_MAX)
+            .build();
+
+        let mut compressed_payload = Vec::with_capacity(payload.len());
+
+        let result = compress_to_vec(payload, &mut compressed_payload, &prefs);
+
+        match result {
+            Ok(output_len) => Ok((compressed_payload, output_len)),
+            Err(error) => {
+                Err(format!("[Compressed bytes vector: Payload] Message body compression error: {:?}", error).into())
+            },
+        }
+    }
+
+    pub fn payload_decompress(compressed_payload: &[u8]) -> Result<(Vec<u8>, usize), Error> {
+        let mut decompressed_payload = Vec::new();
+
+        let result = decompress_to_vec(compressed_payload, &mut decompressed_payload);
+
+        match result {
+            Ok(output_len) => Ok((decompressed_payload, output_len)),
+            Err(error) => {
+                Err(format!("[Compressed bytes vector: Payload] Message body decompression error: {:?}", error).into())
+            },
+        }
+    }
 }
 
 impl<T> BorealisMessage<T>
@@ -240,7 +273,7 @@ where
     T: Serialize,
 {
     pub fn to_cbor(&self) -> Result<Vec<u8>, Error> {
-        let envelope_ser = match self.envelope.to_cbor() {
+        let envelope_ser = match self.envelope.to_cbor_arr() {
             Ok(envelope_bytes) => envelope_bytes,
             Err(error) => {
                 return Err(format!("[CBOR bytes vector: Envelope] Message header serialization error: {:?}", error).into())

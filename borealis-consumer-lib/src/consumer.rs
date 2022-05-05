@@ -143,7 +143,7 @@ pub fn init_logging() {
 
     // Filters can be customized through RUST_LOG environment variable via CLI
     let mut env_filter = EnvFilter::new(
-        "tokio_reactor=info,near=info,near=error,stats=info,telemetry=info,near-performance-metrics=info,aggregated=info,near_indexer=info,borealis_indexer=info",
+        "tokio_reactor=info,near=info,near=error,stats=info,telemetry=info,near-performance-metrics=info,aggregated=info,near_indexer=info,borealis_indexer=info,borealis_consumer=info",
     );
 
     if let Ok(rust_log) = std::env::var("RUST_LOG") {
