@@ -7,6 +7,7 @@ use serde_json;
 use serde_json::Value;
 
 use lzzzz::lz4f::{BlockSize, PreferencesBuilder, CLEVEL_MAX, compress_to_vec, decompress_to_vec};
+use zstd::bulk::{compress_to_buffer, decompress_to_buffer};
 
 pub use near_primitives::hash::CryptoHash;
 pub use near_primitives::{types, views};
@@ -236,7 +237,7 @@ impl<T> BorealisMessage<T> {
         }
     }
 
-    pub fn payload_compress(payload: &[u8]) -> Result<(Vec<u8>, usize), Error> {
+    pub fn payload_compress_lz4(payload: &[u8]) -> Result<(Vec<u8>, usize), Error> {
         let prefs = PreferencesBuilder::new()
             .block_size(BlockSize::Max1MB)
             .compression_level(CLEVEL_MAX)
@@ -249,12 +250,12 @@ impl<T> BorealisMessage<T> {
         match result {
             Ok(output_len) => Ok((compressed_payload, output_len)),
             Err(error) => {
-                Err(format!("[Compressed bytes vector: Payload] Message body compression error: {:?}", error).into())
+                Err(format!("[LZ4 compressed bytes vector: Payload] Message body compression error: {:?}", error).into())
             },
         }
     }
 
-    pub fn payload_decompress(compressed_payload: &[u8]) -> Result<(Vec<u8>, usize), Error> {
+    pub fn payload_decompress_lz4(compressed_payload: &[u8]) -> Result<(Vec<u8>, usize), Error> {
         let mut decompressed_payload = Vec::new();
 
         let result = decompress_to_vec(compressed_payload, &mut decompressed_payload);
@@ -262,7 +263,33 @@ impl<T> BorealisMessage<T> {
         match result {
             Ok(output_len) => Ok((decompressed_payload, output_len)),
             Err(error) => {
-                Err(format!("[Compressed bytes vector: Payload] Message body decompression error: {:?}", error).into())
+                Err(format!("[LZ4 compressed bytes vector: Payload] Message body decompression error: {:?}", error).into())
+            },
+        }
+    }
+
+    pub fn payload_compress_zstd(payload: &[u8]) -> Result<(Vec<u8>, usize), Error> {
+        let mut compressed_payload = Vec::with_capacity(payload.len());
+
+        let result = compress_to_buffer(payload, &mut compressed_payload, 19);
+
+        match result {
+            Ok(output_len) => Ok((compressed_payload, output_len)),
+            Err(error) => {
+                Err(format!("[Zstd compressed bytes vector: Payload] Message body compression error: {:?}", error).into())
+            },
+        }
+    }
+
+    pub fn payload_decompress_zstd(compressed_payload: &[u8]) -> Result<(Vec<u8>, usize), Error> {
+        let mut decompressed_payload = Vec::new();
+
+        let result = decompress_to_buffer(compressed_payload, &mut decompressed_payload);
+
+        match result {
+            Ok(output_len) => Ok((decompressed_payload, output_len)),
+            Err(error) => {
+                Err(format!("[Zstd compressed bytes vector: Payload] Message body decompression error: {:?}", error).into())
             },
         }
     }
